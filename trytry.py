@@ -16,10 +16,11 @@ import matplotlib.colors
 from skimage import io
 from math import sin, cos, pi
 import torchvision.utils as vutils
+from model import *
 
 path = "/home/birdy/code/master-thesis/"
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
+keypoint_threshold = 7
 
 # a dataset that constructs heatmaps and optional matching caption encodings tensors on the fly
 class HeatmapDataset(torch.utils.data.Dataset):
@@ -161,7 +162,7 @@ class HeatmapDataset(torch.utils.data.Dataset):
 
 caption_path = '/home/birdy/datasets/coco/annotations/captions_train2017.json'
 keypoint_path = '/home/birdy/datasets/coco/annotations/person_keypoints_train2017.json'
-text_model_path = '/home/birdy/wiki.en.bin'
+text_model_path = '/home/birdy/amazon_review_polarity.bin'
 print("here")
 text_model = fasttext.load_model(text_model_path)
 print("and here2")
