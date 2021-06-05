@@ -1,24 +1,10 @@
-from pycocotools.coco import COCO
-import torch.optim as optim
-import fasttext
-fasttext.FastText.eprint = lambda x: None
-from datetime import datetime
-#from torch.utils.tensorboard import SummaryWriter
-from torch.autograd import grad
-
 import torch
-import torch.nn as nn
-import torch.utils.data
-import numpy as np
 import random
-import matplotlib.pyplot as plt
-import matplotlib.colors
-from skimage import io
-from math import sin, cos, pi
-import torchvision.utils as vutils
+from math import beta
 
-path = "/home/birdy/code/master-thesis/"
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+from hyperparams import *
+from path import *
+from utils import *
 
 
 # a dataset that constructs heatmaps and optional matching caption encodings tensors on the fly
@@ -159,20 +145,4 @@ class HeatmapDataset(torch.utils.data.Dataset):
         else:
             return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
 
-caption_path = '/home/birdy/datasets/coco/annotations/captions_train2017.json'
-keypoint_path = '/home/birdy/datasets/coco/annotations/person_keypoints_train2017.json'
-text_model_path = '/home/birdy/wiki.en.bin'
-print("here")
-text_model = fasttext.load_model(text_model_path)
-print("and here2")
-multi = False
-coco_caption = COCO(caption_path)
-coco_keypoint = COCO(keypoint_path)
-dataset = HeatmapDataset(coco_keypoint, coco_caption, single_person=not multi, text_model=text_model, full_image=multi)
-data_loader = torch.utils.data.DataLoader(dataset, batch_size=128, shuffle=True, num_workers=2)
-print("and here2")
-real_batch = next(iter(data_loader))
-plt.figure(figsize=(8,8))
-plt.axis("off")
-plt.title("Training Images")
-plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:64], padding=2, normalize=True).cpu(),(1,2,0)))
+
