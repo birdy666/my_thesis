@@ -16,11 +16,18 @@ import matplotlib.colors
 from skimage import io
 from math import sin, cos, pi
 import torchvision.utils as vutils
+from model import *
 
+<<<<<<< HEAD:trytry/trytry.py
 from model import *
 
 #path = "/home/birdy/code/master-thesis/"
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+=======
+path = "/home/birdy/code/master-thesis/"
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+keypoint_threshold = 7
+>>>>>>> 01c088b7bbee96c4b2903b0d26ba4de351912619:trytry.py
 
 # a dataset that constructs heatmaps and optional matching caption encodings tensors on the fly
 class HeatmapDataset(torch.utils.data.Dataset):
@@ -160,10 +167,16 @@ class HeatmapDataset(torch.utils.data.Dataset):
         else:
             return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
 
+<<<<<<< HEAD:trytry/trytry.py
 
 caption_path = '../datasets/coco/annotations/captions_train2017.json'
 keypoint_path = '../datasets/coco/annotations/person_keypoints_train2017.json'
 text_model_path = '../fastText/wiki.en.bin'
+=======
+caption_path = '/home/birdy/datasets/coco/annotations/captions_train2017.json'
+keypoint_path = '/home/birdy/datasets/coco/annotations/person_keypoints_train2017.json'
+text_model_path = '/home/birdy/amazon_review_polarity.bin'
+>>>>>>> 01c088b7bbee96c4b2903b0d26ba4de351912619:trytry.py
 print("here")
 text_model = fasttext.load_model(text_model_path)
 print("and here2")
