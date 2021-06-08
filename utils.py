@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from math import sin, cos, pi, sigma
+from math import sin, cos, pi
 import random
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -18,6 +18,7 @@ def get_caption_vector(text_model, caption):
 
 # get a batch of noise vectors
 def get_noise_tensor(number):
+    """number x 128 x 1 x 1"""
     noise_tensor = torch.randn((number, noise_size, 1, 1), dtype=torch.float32)
     return noise_tensor
 
@@ -348,20 +349,20 @@ def plot_heatmap(heatmap, skeleton=None, image_path=None, caption=None, only_ske
         plt.title('stacked heatmaps' + (' and skeleton' if skeleton is not None else ''))
         plt.xlabel(caption)
         plt.subplot(1, 2, 2)
-        """plt.imshow(image)
-        plt.title('training image')"""   
-        im = Image.fromarray((image * 255).astype(np.uint8))
-        im.save("yoyoyoitsheatmap.jpeg")
+        plt.imshow(image)
+        plt.title('training image')  
+        """im = Image.fromarray((image * 255).astype(np.uint8))
+        im.save("yoyoyoitsheatmap.jpeg")"""
     else:        
-        """plt.imshow(heatmap_color)"""
-        im = Image.fromarray((heatmap_color * 255).astype(np.uint8))
-        im.save("yoyoyoitsheatmap.jpeg")
-        """if skeleton is not None:
+        plt.imshow(heatmap_color)
+        """im = Image.fromarray((heatmap_color * 255).astype(np.uint8))
+        im.save("yoyoyoitsheatmap.jpeg")"""
+        if skeleton is not None:
             [plt.plot(x_skeleton[i], y_skeleton[i], c=skeleton_colors[i], linewidth=5) for i in skeleton_show]
             [plt.plot(x_keypoint[i], y_keypoint[i], 'o', c=keypoint_colors[i], markersize=10, markeredgecolor='k',
                       markeredgewidth=1) for i in keypoint_show]
         plt.title('stacked heatmaps' + (' and skeleton' if skeleton is not None else ''))
-        plt.xlabel(caption)"""
+        plt.xlabel(caption)
 
 # plot a pose
 def plot_pose(x, y, v, skeleton, caption=None):
@@ -381,3 +382,25 @@ def plot_pose(x, y, v, skeleton, caption=None):
      keypoint_show]
     plt.title('pose')
     plt.xlabel(caption)
+
+
+#
+def plot_generative_samples_from_noise(fixed_fake, fixed_real_array, fixed_caption, fixed_w, fixed_h, multi, skeleton, start_from_epoch):
+    fixed_fake = np.array(fixed_fake.tolist()) * 0.5 + 0.5
+    f = plt.figure(figsize=(19.2, 12))
+    for sample in range(fixed_w):
+        plt.subplot(fixed_h + 1, fixed_w, sample + 1)
+        plot_heatmap(fixed_real_array[sample], skeleton=(None if multi else skeleton))
+        plt.title(fixed_caption[sample][0:30] + '\n' + fixed_caption[sample][30:])
+        plt.xlabel('(real)')
+        plt.xticks([])
+        plt.yticks([])
+    for sample in range(fixed_w*fixed_h):
+        plt.subplot(fixed_h + 1, fixed_w, fixed_w + sample + 1)
+        plot_heatmap(fixed_fake[sample], skeleton=(None if multi else skeleton))
+        plt.title(None)
+        plt.xlabel('(fake)')
+        plt.xticks([])
+        plt.yticks([])
+    plt.savefig(figures_path + 'fixed_noise_samples_' + f'{start_from_epoch:05d}' + '_new.png')
+    plt.close()

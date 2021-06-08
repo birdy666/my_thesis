@@ -1,4 +1,4 @@
-from model import *
+from model import Generator, Generator2, Discriminator, Discriminator2, weights_init
 from pycocotools.coco import COCO
 import torch.optim as optim
 import fasttext
@@ -6,6 +6,13 @@ from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 from torch.autograd import grad
 import torch
+import torch.nn as nn
+import numpy as np
+import matplotlib.pyplot as plt
+
+from heatmap import HeatmapDataset
+from path import *
+from utils import *
 
 workers = 8
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -17,8 +24,8 @@ multi = False
 batch_size = 128
 learning_rate_g = 0.0004
 learning_rate_d = 0.0004
-start_from_epoch = 200
-end_in_epoch = 1200
+start_from_epoch = 0#200
+end_in_epoch = 1#1200
 
 # algorithms: gan, wgan, wgan-gp, wgan-lp
 # gan: k = 1, beta_1 = 0.5, beta_2 = 0.999, lr = 0.0001, epoch = 50~300
@@ -43,18 +50,23 @@ k = 5
 beta_1 = 0.0
 beta_2 = 0.9
 
+"""
+讀取caption和keypoint的annotation
+"""
 # read captions and keypoints from files
 coco_caption = COCO(caption_path)
 coco_keypoint = COCO(keypoint_path)
 coco_caption_val = COCO(caption_path_val)
 coco_keypoint_val = COCO(keypoint_path_val)
-
 # keypoint connections (skeleton) from annotation file
 skeleton = np.array(coco_keypoint.loadCats(coco_keypoint.getCatIds())[0].get('skeleton')) - 1
-
 # load text encoding model
 text_model = fasttext.load_model(text_model_path)
 
+"""
+取得dataset
+"""
+print("create dataloaders")
 # get the dataset (single person, with captions)
 dataset = HeatmapDataset(coco_keypoint, coco_caption, single_person=not multi, text_model=text_model, full_image=multi)
 dataset_val = HeatmapDataset(coco_keypoint_val, coco_caption_val, single_person=not multi, text_model=text_model,
@@ -69,6 +81,8 @@ text_match_val = data_val.get('vector').to(device)
 heatmap_real_val = data_val.get('heatmap').to(device)
 label_val = torch.full((len(dataset_val),), 1, dtype=torch.float32, device=device)
 
+print("create nn")
+
 net_g = Generator2().to(device)
 if algorithm == 'gan':
     net_d = Discriminator2(bn=True, sigmoid=True).to(device)
@@ -79,6 +93,9 @@ else:
 net_g.apply(weights_init)
 net_d.apply(weights_init)
 
+"""
+看有沒有之前沒訓練完的要接續
+"""
 # load first step (without captions) trained weights if available
 if start_from_epoch > 0:
     net_g.load_state_dict(torch.load(generator_path + '_' + f'{start_from_epoch:05d}'), False)
@@ -97,6 +114,7 @@ fixed_train = dataset_val.get_random_heatmap_with_caption(fixed_w)
 fixed_real = fixed_train.get('heatmap').to(device)
 fixed_real_array = np.array(fixed_real.tolist()) * 0.5 + 0.5
 fixed_caption = fixed_train.get('caption')
+"""6個128x1x1 ==> 4維陣列， 他是下面想要畫出6個假的pose"""
 fixed_noise = get_noise_tensor(fixed_h).to(device)
 fixed_text = torch.tensor([get_caption_vector(text_model, caption) for caption in fixed_caption], dtype=torch.float32,
                           device=device).unsqueeze(-1).unsqueeze(-1)
@@ -108,26 +126,13 @@ torch.save(net_d.state_dict(), discriminator_path + '_' + f'{start_from_epoch:05
 # plot and save generated samples from fixed noise (before training begins)
 net_g.eval()
 with torch.no_grad():
+    """
+    每個row有5張對應到不同語句的假pose，用的都是同樣的noise。所以這裡用repeat_interleave(5, dim=1)
+    每個text會場生6張假pose，所以用repeat(6, 1, 1, 1))
+    """
     fixed_fake = net_g(fixed_noise.repeat_interleave(fixed_w, dim=0), fixed_text.repeat(fixed_h, 1, 1, 1))
 net_g.train()
-fixed_fake = np.array(fixed_fake.tolist()) * 0.5 + 0.5
-f = plt.figure(figsize=(19.2, 12))
-for sample in range(fixed_w):
-    plt.subplot(fixed_h + 1, fixed_w, sample + 1)
-    plot_heatmap(fixed_real_array[sample], skeleton=(None if multi else skeleton))
-    plt.title(fixed_caption[sample][0:30] + '\n' + fixed_caption[sample][30:])
-    plt.xlabel('(real)')
-    plt.xticks([])
-    plt.yticks([])
-for sample in range(fixed_size):
-    plt.subplot(fixed_h + 1, fixed_w, fixed_w + sample + 1)
-    plot_heatmap(fixed_fake[sample], skeleton=(None if multi else skeleton))
-    plt.title(None)
-    plt.xlabel('(fake)')
-    plt.xticks([])
-    plt.yticks([])
-plt.savefig('figures/fixed_noise_samples_' + f'{start_from_epoch:05d}' + '_new.png')
-plt.close()
+plot_generative_samples_from_noise(fixed_fake, fixed_real_array, fixed_caption, fixed_w, fixed_h, multi, skeleton, start_from_epoch)
 
 # train
 start = datetime.now()
@@ -148,21 +153,24 @@ for e in range(start_from_epoch, end_in_epoch):
         optimizer_d.param_groups[0].get('lr')))
 
     for i, batch in enumerate(data_loader, 0):
-        # first, optimize discriminator
+        ############################
+        # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+        ###########################
         net_d.zero_grad()
 
         # get heatmaps, sentence vectors and noises
-        heatmap_real = batch.get('heatmap')
-        text_match = batch.get('vector')
+        heatmap_real = batch.get('heatmap').to(device)
+        text_match = batch.get('vector').to(device)
         current_batch_size = len(heatmap_real)
-        text_mismatch = dataset.get_random_caption_tensor(current_batch_size)
-        noise = get_noise_tensor(current_batch_size)
+        text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
+        noise = get_noise_tensor(current_batch_size).to(device)
 
-        heatmap_real = heatmap_real.to(device)
+        """heatmap_real = heatmap_real.to(device)
         text_match = text_match.to(device)
         text_mismatch = text_mismatch.to(device)
-        noise = noise.to(device)
-
+        noise = noise.to(device)"""
+        """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
+        fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
         # discriminate heatmpap-text pairs
         score_right = net_d(heatmap_real, text_match)
         score_wrong = net_d(heatmap_real, text_mismatch)
@@ -229,7 +237,9 @@ for e in range(start_from_epoch, end_in_epoch):
         # log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)
 
-        # second, optimize generator
+        ############################
+        # (2) Update G network: maximize log(D(G(z)))
+        ###########################
         if iteration == k:
             net_g.zero_grad()
             iteration = 0
@@ -282,24 +292,7 @@ for e in range(start_from_epoch, end_in_epoch):
     with torch.no_grad():
         fixed_fake = net_g(fixed_noise.repeat_interleave(fixed_w, dim=0), fixed_text.repeat(fixed_h, 1, 1, 1))
     net_g.train()
-    fixed_fake = np.array(fixed_fake.tolist()) * 0.5 + 0.5
-    f = plt.figure(figsize=(19.2, 12))
-    for sample in range(fixed_w):
-        plt.subplot(fixed_h + 1, fixed_w, sample + 1)
-        plot_heatmap(fixed_real_array[sample], skeleton=(None if multi else skeleton))
-        plt.title(fixed_caption[sample][0:30] + '\n' + fixed_caption[sample][30:])
-        plt.xlabel('(real)')
-        plt.xticks([])
-        plt.yticks([])
-    for sample in range(fixed_size):
-        plt.subplot(fixed_h + 1, fixed_w, fixed_w + sample + 1)
-        plot_heatmap(fixed_fake[sample], skeleton=(None if multi else skeleton))
-        plt.title(None)
-        plt.xlabel('(fake)')
-        plt.xticks([])
-        plt.yticks([])
-    plt.savefig('figures/fixed_noise_samples_' + f'{e + 1:05d}' + '.png')
-    plt.close()
+    plot_generative_samples_from_noise(fixed_fake, fixed_real_array, fixed_caption, fixed_w, fixed_h, multi, skeleton, start_from_epoch)
 
     # validate
     net_g.eval()

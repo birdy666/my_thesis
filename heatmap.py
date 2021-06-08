@@ -1,6 +1,6 @@
 import torch
 import random
-from math import beta
+from hyperparams import beta
 
 from hyperparams import *
 from path import *
@@ -18,44 +18,59 @@ class HeatmapDataset(torch.utils.data.Dataset):
 
         self.with_vector = (text_model is not None)
         self.for_regression = for_regression
-        if for_regression:
-            full_image = False
-        self.full_image = full_image
+        
+        self.full_image = full_image and not for_regression
         self.dataset = []
 
         for image_id in image_ids:
-            keypoint_ids = coco_keypoint.getAnnIds(imgIds=image_id)
-            if len(keypoint_ids) > 0 and ((single_person and len(keypoint_ids) == 1) or (not single_person)):
-                caption_ids = coco_caption.getAnnIds(imgIds=image_id)
-                captions = coco_caption.loadAnns(ids=caption_ids)
-                keypoints = coco_keypoint.loadAnns(ids=keypoint_ids)
-
+            """keypoints是一个长度为3k的数组，其中k是category 中 keypoints 的总数量。每一个keypoint 是一个长度为3的数组，
+            第一和第二个元素分别是 x和 y坐标值，第三个元素是个标志位 v，v为 0时表示这个关键点没有标注（这种情况下 x = y = v = 0 ），
+            v 为 1时表示这个关键点标注了但是不可见（被遮挡了），v 为 2时表示这个关键点标注了同时也可见。
+            
+            以人類來說category id=1, k為17 依序為0:鼻子,1:左眼,2:右眼...
+            以目前看到的例子來說 在human pose的訓練資料裡每張圖片可以有多個annotations，每個annotation會有一個category及其對應的一組keypoints
+            然後一張圖片也可能有很多annotations其category都是相同的，好比說一張照片裡有很多人
+            也可以說一個category為1的annotation對應到一個人
+            """
+            keypoint_ann_ids = coco_keypoint.getAnnIds(imgIds=image_id)
+            """
+            len(keypoint_ann_ids) > 0 表示這張圖片至少有標記了一個東西
+            這裡keypoint_ann_ids = coco_keypoint.getAnnIds(imgIds=image_id) 因為是從person_keypoints這個json檔抓進來的 所以應該所有category都是1(human)
+            
+            """
+            if len(keypoint_ann_ids) > 0 and ((single_person and len(keypoint_ann_ids) == 1) or (not single_person)):
+                keypoint_anns = coco_keypoint.loadAnns(ids=keypoint_ann_ids)
+                caption_ann_ids = coco_caption.getAnnIds(imgIds=image_id)
+                caption_anns = coco_caption.loadAnns(ids=caption_ann_ids)
+                
+                """以整張圖為單位 一筆data代表這張圖裡的所有人。另一個為以個人為單位，一筆data表示一個人"""
                 if full_image:
-                    data = {'keypoints': [], 'caption': captions.copy(),
+                    data = {'keypoints': [], 'caption': caption_anns.copy(),
                             'image': coco_keypoint.loadImgs(image_id)[0]}
-                    for keypoint in keypoints:
+                    """多人的情況下"""
+                    for keypoint in keypoint_anns: 
+                        """每一個人有17個特徵點，但有些可能沒有標到，這裡是說一個人要標到一定的量才把這個人算進去"""
                         if keypoint.get('num_keypoints') > keypoint_threshold:
                             data['keypoints'].append(keypoint.copy())
+                    """這張照片每個人被標的特徵點數量都不達標當作沒人，跳過"""
                     if len(data['keypoints']) == 0:
                         continue
 
                     # add sentence encoding
                     if text_model is not None:
-                        data['vector'] = [get_caption_vector(text_model, caption.get('caption')) for caption in
-                                          captions]
-                    self.dataset.append(data)
+                        data['vector'] = [get_caption_vector(text_model, caption.get('caption')) for caption in caption_anns]
+                    self.dataset.append(data)                    
                 else:
                     # each person in the image
-                    for keypoint in keypoints:
+                    for keypoint in keypoint_anns:
                         # with enough keypoints
                         if keypoint.get('num_keypoints') > keypoint_threshold:
-                            data = {'keypoint': keypoint.copy(), 'caption': captions.copy(),
+                            data = {'keypoint': keypoint.copy(), 'caption': caption_anns.copy(),
                                     'image': coco_keypoint.loadImgs(image_id)[0]}
 
                             # add sentence encoding
                             if text_model is not None:
-                                data['vector'] = [get_caption_vector(text_model, caption.get('caption')) for caption in
-                                                  captions]
+                                data['vector'] = [get_caption_vector(text_model, caption.get('caption')) for caption in caption_anns]
                             self.dataset.append(data)
 
     def __len__(self):
@@ -139,10 +154,7 @@ class HeatmapDataset(torch.utils.data.Dataset):
                 # interpolate caption sentence vectors
                 interpolated_vector = beta * vector + (1 - beta) * vector2
                 vector_tensor[i] = torch.tensor(interpolated_vector, dtype=torch.float32)
-
         if self.for_regression:
             return vector_tensor
         else:
             return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
-
-
