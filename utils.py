@@ -121,45 +121,57 @@ def one_nearest_neighbor(heatmap_max_index_list, heatmap_max_index_list2):
 def get_augment_parameters(flip, scale, rotate, translate):
     # random flip, rotation, scaling, translation
     f = random.random() < flip
-    a = random.uniform(-rotate, rotate) * pi / 180
+    r = random.uniform(-rotate, rotate) * pi / 180
     s = random.uniform(scale, 1 / scale)
     tx = random.uniform(-translate, translate)
     ty = random.uniform(-translate, translate)
-    return f, a, s, tx, ty
+    return f, r, s, tx, ty
 
 
 # return coordinates of keypoints in the heatmap and visibility
-def get_coordinates(x0, y0, w, h, keypoint):
+def get_coordinates(keypoint_ann, full_image=False):
+    """
+    (x0, y0): bbox左上角的座標
+    (x, y): 特徵點的座標，必定都比x0, y0大，因為這個座標會被包在bbox中
+    """
+    x0, y0, w, h = tuple(keypoint_ann.get('bbox'))
+    if full_image:
+        x0 = 0
+        y0 = 0
     # keypoints location (x, y) and visibility (v, 0 invisible, 1 visible)
-    x = np.array(keypoint.get('keypoints')[0::3])
-    y = np.array(keypoint.get('keypoints')[1::3])
-    v = np.array(keypoint.get('keypoints')[2::3]).clip(0, 1)
+    x = np.array(keypoint_ann.get('keypoints')[0::3])
+    y = np.array(keypoint_ann.get('keypoints')[1::3])
+    v = np.array(keypoint_ann.get('keypoints')[2::3]).clip(0, 1)
 
     # calculate the scaling
-    heatmap_half = heatmap_size / 2
     if h > w:
-        x = heatmap_half - w / h * heatmap_half + (x - x0) / h * heatmap_size
-        y = (y - y0) / h * heatmap_size
+        """
+        由於bbox可能不是正方形，所以他想把它變成正方形，並取長的邊當作正方形的邊
+        這裡先看y，(y - y0) / h就是y座標在正方形bbox上的比例位置，乘上 heatmap_size 就是在heatmap上的位置
+        x的話也先用一樣的方式校正，但因為正方形bbox在w方向有h-w的長度是後來加上去的這個長度放到heatmap就是heatmap_size * (1 - w/h)
+        為甚麼最後除以二， 因為想像把這多出來的h-w切一半分別加到bbox的左右邊，這樣才不會太偏左
+        """
+        x_heatmap = (x - x0) / h * heatmap_size + (heatmap_size * (1 - w/h)) / 2
+        y_heatmap = (y - y0) / h * heatmap_size
     else:
-        x = (x - x0) / w * heatmap_size
-        y = heatmap_half - h / w * heatmap_half + (y - y0) / w * heatmap_size
+        x_heatmap = (x - x0) / w * heatmap_size
+        y_heatmap = (y - y0) / w * heatmap_size + (heatmap_size * (1 - h/w)) / 2
 
     # set invisible keypoint coordinates as (0,0)
-    x[v < 1] = 0
-    y[v < 1] = 0
+    x_heatmap[v < 1] = 0
+    y_heatmap[v < 1] = 0
 
-    return x, y, v
+    return x_heatmap, y_heatmap, v
 
 
 # return coordinates of keypoints in the heatmap and visibility with augmentation
-def get_augmented_coordinates(keypoint):
+def get_augmented_coordinates(keypoint_ann):
     # coordinates and visibility before augmentation
-    x0, y0, w, h = tuple(keypoint.get('bbox'))
-    x, y, v = get_coordinates(x0, y0, w, h, keypoint)
+    x, y, v = get_coordinates(keypoint_ann)
 
     # random flip, rotation, scaling, translation
-    f, a, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
-    x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, a, s, tx, ty)
+    f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
+    x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, r, s, tx, ty)
 
     # set invisible keypoint coordinates as (0,0)
     x[v < 1] = 0
@@ -197,24 +209,23 @@ def heatmap_to_max_index(heatmap):
 
 
 # return ground truth heatmap of a training sample (fixed-sized square-shaped, can be augmented)
-def get_heatmap(keypoint, augment=True):
+def get_heatmap(keypoint_ann, augment=True):
     # x-y grids
     x_grid = np.repeat(np.array([range(heatmap_size)]), heatmap_size, axis=0)
     y_grid = np.repeat(np.array([range(heatmap_size)]).transpose(), heatmap_size, axis=1)
     empty = np.zeros([heatmap_size, heatmap_size], dtype='float32')
 
     # heatmap dimension is (number of keypoints)*(heatmap size)*(heatmap size)
-    x0, y0, w, h = tuple(keypoint.get('bbox'))
     heatmap = np.empty((total_keypoints, heatmap_size, heatmap_size), dtype='float32')
 
     # keypoints location (x, y) and visibility (v)
-    x, y, v = get_coordinates(x0, y0, w, h, keypoint)
+    x, y, v = get_coordinates(keypoint_ann)
 
     # do heatmap augmentation
     if augment:
         # random flip, rotation, scaling, translation
-        f, a, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
-        x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, a, s, tx, ty)
+        f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
+        x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, r, s, tx, ty)
 
     for i in range(total_keypoints):
         # labeled keypoints' v > 0
@@ -228,7 +239,7 @@ def get_heatmap(keypoint, augment=True):
 
 
 # return ground truth heatmap of a whole training image (fixed-sized square-shaped, can be augmented)
-def get_full_image_heatmap(image, keypoints, augment=True):
+def get_full_image_heatmap(image, keypoint_anns, augment=True):
     # x-y grids
     x_grid = np.repeat(np.array([range(heatmap_size)]), heatmap_size, axis=0)
     y_grid = np.repeat(np.array([range(heatmap_size)]).transpose(), heatmap_size, axis=1)
@@ -237,20 +248,20 @@ def get_full_image_heatmap(image, keypoints, augment=True):
     # heatmap dimension is (number of keypoints)*(heatmap size)*(heatmap size)
     h = image.get('height')
     w = image.get('width')
-    heatmap = np.empty((len(keypoints), total_keypoints, heatmap_size, heatmap_size), dtype='float32')
+    heatmap = np.empty((len(keypoint_anns), total_keypoints, heatmap_size, heatmap_size), dtype='float32')
 
     if augment:
         # random flip, rotation, scaling, translation
-        f, a, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
+        f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
 
     # create individual heatmaps
-    for j, keypoint in enumerate(keypoints, 0):
+    for j, keypoint_ann in enumerate(keypoint_anns, 0):
         # keypoints location (x, y) and visibility (v)
-        x, y, v = get_coordinates(0, 0, w, h, keypoint)
+        x, y, v = get_coordinates(keypoint_ann, full_image=True)
 
         # do heatmap augmentation
         if augment:
-            x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, a, s, tx, ty)
+            x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, r, s, tx, ty)
 
         for i in range(total_keypoints):
             # labeled keypoints' v > 0
@@ -267,6 +278,7 @@ def get_full_image_heatmap(image, keypoints, augment=True):
 
 # do heatmap augmentation
 def augment_heatmap(x, y, v, heatmap_half, f, a, s, tx, ty):
+    """把中心點從左上變成中間"""
     x = x - heatmap_half
     y = y - heatmap_half
 
