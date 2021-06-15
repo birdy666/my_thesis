@@ -1,4 +1,4 @@
-from model import Generator, Generator2, Discriminator, Discriminator2, weights_init
+from model import Generator2, Discriminator2, weights_init
 from pycocotools.coco import COCO
 import torch.optim as optim
 import fasttext
@@ -109,7 +109,6 @@ criterion = nn.BCELoss()
 # fixed training data (from validation set), noise and sentence vectors to see the progression
 fixed_h = 6
 fixed_w = 5
-fixed_size = fixed_h * fixed_w
 fixed_train = dataset_val.get_random_heatmap_with_caption(fixed_w)
 fixed_real = fixed_train.get('heatmap').to(device)
 fixed_real_array = np.array(fixed_real.tolist()) * 0.5 + 0.5
@@ -165,10 +164,6 @@ for e in range(start_from_epoch, end_in_epoch):
         text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
         noise = get_noise_tensor(current_batch_size).to(device)
 
-        """heatmap_real = heatmap_real.to(device)
-        text_match = text_match.to(device)
-        text_mismatch = text_mismatch.to(device)
-        noise = noise.to(device)"""
         """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
         fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
         # discriminate heatmpap-text pairs

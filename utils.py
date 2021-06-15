@@ -117,27 +117,19 @@ def one_nearest_neighbor(heatmap_max_index_list, heatmap_max_index_list2):
     return count / size / 2
 
 
-# return parameters for an augmentation
-def get_augment_parameters(flip, scale, rotate, translate):
-    # random flip, rotation, scaling, translation
-    f = random.random() < flip
-    r = random.uniform(-rotate, rotate) * pi / 180
-    s = random.uniform(scale, 1 / scale)
-    tx = random.uniform(-translate, translate)
-    ty = random.uniform(-translate, translate)
-    return f, r, s, tx, ty
-
-
 # return coordinates of keypoints in the heatmap and visibility
-def get_coordinates(keypoint_ann, full_image=False):
+def get_coordinates(keypoint_ann, full_image=False, img_size=None, augment=False):
     """
     (x0, y0): bbox左上角的座標
-    (x, y): 特徵點的座標，必定都比x0, y0大，因為這個座標會被包在bbox中
-    """
-    x0, y0, w, h = tuple(keypoint_ann.get('bbox'))
+    (x, y): 特徵點的座標，必定都比x0, y0大，因為這個座標會被包在bbox中    """
+    
     if full_image:
         x0 = 0
         y0 = 0
+        h = img_size[0]
+        w = img_size[1]
+    else:
+        x0, y0, w, h = tuple(keypoint_ann.get('bbox'))
     # keypoints location (x, y) and visibility (v, 0 invisible, 1 visible)
     x = np.array(keypoint_ann.get('keypoints')[0::3])
     y = np.array(keypoint_ann.get('keypoints')[1::3])
@@ -161,9 +153,45 @@ def get_coordinates(keypoint_ann, full_image=False):
     x_heatmap[v < 1] = 0
     y_heatmap[v < 1] = 0
 
-    return x_heatmap, y_heatmap, v
+    return augment_coordinates(x_heatmap, y_heatmap, v) if augment else (x, y, v)
 
 
+# do heatmap augmentation
+def augment_coordinates(x, y, v):
+    # random flip, rotation, scaling, translation
+    """把中心點從左上變成中間，為的是下面的flip"""
+    x = x - heatmap_size / 2
+    y = y - heatmap_size / 2
+
+    # flip
+    if random.random() < flip:
+        x = -x
+        # when flipped, left and right should be swapped
+        x = x[left_right_swap]
+        y = y[left_right_swap]
+        v = v[left_right_swap]
+
+    # rotation
+    r = random.uniform(-rotate, rotate) * pi / 180
+    sin_a = sin(r)
+    cos_a = cos(r)
+    x, y = tuple(np.dot(np.array([[cos_a, -sin_a], [sin_a, cos_a]]), np.array([x, y])))
+
+    # scaling
+    s = random.uniform(scale, 1 / scale)
+    x = x * s
+    y = y * s
+
+    # translation
+    """之前把它減了heatmap_size / 2 現在加回來"""
+    x = x + random.uniform(-translate, translate) + heatmap_size / 2
+    y = y + random.uniform(-translate, translate) + heatmap_size / 2
+
+    return x, y, v
+
+""" 這只用在heatmap.py的兩個地方，其中一個是要在regression條件之下，另一個則是沒用到
+為啥我要把這個註銷調ㄋ 因為這名子她媽娶得太爛 應該要給那個augment_heatmap用才對吧 ???
+augment_heatmap 是沙小 
 # return coordinates of keypoints in the heatmap and visibility with augmentation
 def get_augmented_coordinates(keypoint_ann):
     # coordinates and visibility before augmentation
@@ -171,22 +199,22 @@ def get_augmented_coordinates(keypoint_ann):
 
     # random flip, rotation, scaling, translation
     f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
-    x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, r, s, tx, ty)
+    x, y, v = augment_heatmap(x, y, v, heatmap_size, f, r, s, tx, ty)
 
     # set invisible keypoint coordinates as (0,0)
     x[v < 1] = 0
     y[v < 1] = 0
 
     # concatenate the coordinates and visibility
-    return np.concatenate([x, y, v])
+    return np.concatenate([x, y, v])"""
 
 
-# seperate coordinates and visibility from an array
+"""沒用到# seperate coordinates and visibility from an array
 def result_to_coordinates(result):
     x = result[0:total_keypoints]
     y = result[total_keypoints:2 * total_keypoints]
     v = (np.sign(result[2 * total_keypoints:3 * total_keypoints] - v_threshold) + 1) / 2
-    return x, y, v
+    return x, y, v"""
 
 """
 Heatmap
@@ -213,19 +241,13 @@ def get_heatmap(keypoint_ann, augment=True):
     # x-y grids
     x_grid = np.repeat(np.array([range(heatmap_size)]), heatmap_size, axis=0)
     y_grid = np.repeat(np.array([range(heatmap_size)]).transpose(), heatmap_size, axis=1)
-    empty = np.zeros([heatmap_size, heatmap_size], dtype='float32')
 
     # heatmap dimension is (number of keypoints)*(heatmap size)*(heatmap size)
     heatmap = np.empty((total_keypoints, heatmap_size, heatmap_size), dtype='float32')
 
     # keypoints location (x, y) and visibility (v)
-    x, y, v = get_coordinates(keypoint_ann)
+    x, y, v = get_coordinates(keypoint_ann, augment=augment)
 
-    # do heatmap augmentation
-    if augment:
-        # random flip, rotation, scaling, translation
-        f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
-        x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, r, s, tx, ty)
 
     for i in range(total_keypoints):
         # labeled keypoints' v > 0
@@ -233,36 +255,29 @@ def get_heatmap(keypoint_ann, augment=True):
             # ground truth in heatmap is normal distribution shaped
             heatmap[i] = np.exp(-((x_grid - x[i]) ** 2 + (y_grid - y[i]) ** 2) / (2 * sigma ** 2), dtype='float32')
         else:
-            heatmap[i] = empty.copy()
+            heatmap[i] = np.zeros([heatmap_size, heatmap_size], dtype='float32')
 
     return heatmap
 
 
 # return ground truth heatmap of a whole training image (fixed-sized square-shaped, can be augmented)
 def get_full_image_heatmap(image, keypoint_anns, augment=True):
+    h = image.get('height')
+    w = image.get('width')
     # x-y grids
     x_grid = np.repeat(np.array([range(heatmap_size)]), heatmap_size, axis=0)
     y_grid = np.repeat(np.array([range(heatmap_size)]).transpose(), heatmap_size, axis=1)
-    empty = np.zeros([heatmap_size, heatmap_size], dtype='float32')
+    
 
     # heatmap dimension is (number of keypoints)*(heatmap size)*(heatmap size)
-    h = image.get('height')
-    w = image.get('width')
     heatmap = np.empty((len(keypoint_anns), total_keypoints, heatmap_size, heatmap_size), dtype='float32')
 
-    if augment:
-        # random flip, rotation, scaling, translation
-        f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
 
     # create individual heatmaps
     for j, keypoint_ann in enumerate(keypoint_anns, 0):
         # keypoints location (x, y) and visibility (v)
-        x, y, v = get_coordinates(keypoint_ann, full_image=True)
-
-        # do heatmap augmentation
-        if augment:
-            x, y, v = augment_heatmap(x, y, v, heatmap_size / 2, f, r, s, tx, ty)
-
+        x, y, v = get_coordinates(keypoint_ann, full_image=True, img_size=(h,w), augment=augment)
+       
         for i in range(total_keypoints):
             # labeled keypoints' v > 0
             if v[i] > 0:
@@ -270,41 +285,13 @@ def get_full_image_heatmap(image, keypoint_anns, augment=True):
                 heatmap[j][i] = np.exp(-((x_grid - x[i]) ** 2 + (y_grid - y[i]) ** 2) / (2 * sigma ** 2),
                                        dtype='float32')
             else:
-                heatmap[j][i] = empty.copy()
+                heatmap[j][i] = np.zeros([heatmap_size, heatmap_size], dtype='float32')
 
     # sum individual heatmaps
     return heatmap.sum(axis=0).clip(0, 1)
 
 
-# do heatmap augmentation
-def augment_heatmap(x, y, v, heatmap_half, f, a, s, tx, ty):
-    """把中心點從左上變成中間"""
-    x = x - heatmap_half
-    y = y - heatmap_half
 
-    # flip
-    if f:
-        x = -x
-
-        # when flipped, left and right should be swapped
-        x = x[left_right_swap]
-        y = y[left_right_swap]
-        v = v[left_right_swap]
-
-    # rotation
-    sin_a = sin(a)
-    cos_a = cos(a)
-    x, y = tuple(np.dot(np.array([[cos_a, -sin_a], [sin_a, cos_a]]), np.array([x, y])))
-
-    # scaling
-    x = x * s
-    y = y * s
-
-    # translation
-    x = x + tx + heatmap_half
-    y = y + ty + heatmap_half
-
-    return x, y, v
 
 
 """

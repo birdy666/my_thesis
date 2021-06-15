@@ -8,6 +8,11 @@ flip = 0.5
 rotate = 10
 scale = 1
 translate = 0
+""""keypoints": ["nose",
+                "left_eye","right_eye","left_ear","right_ear",
+                "left_shoulder","right_shoulder","left_elbow","right_elbow",
+                "left_wrist","right_wrist","left_hip","right_hip",
+                "left_knee","right_knee","left_ankle","right_ankle"]"""
 left_right_swap = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
 # size of text encoding
 sentence_vector_size = 300

@@ -48,10 +48,10 @@ class HeatmapDataset(torch.utils.data.Dataset):
                     data = {'keypoints': [], 'caption': caption_anns.copy(),
                             'image': coco_keypoint.loadImgs(image_id)[0]}
                     """多人的情況下"""
-                    for keypoint in keypoint_anns: 
+                    for keypoint_ann in keypoint_anns: 
                         """每一個人有17個特徵點，但有些可能沒有標到，這裡是說一個人要標到一定的量才把這個人算進去"""
-                        if keypoint.get('num_keypoints') > keypoint_threshold:
-                            data['keypoints'].append(keypoint.copy())
+                        if keypoint_ann.get('num_keypoints') > keypoint_threshold:
+                            data['keypoints'].append(keypoint_ann.copy())
                     """這張照片每個人被標的特徵點數量都不達標當作沒人，跳過"""
                     if len(data['keypoints']) == 0:
                         continue
@@ -62,10 +62,10 @@ class HeatmapDataset(torch.utils.data.Dataset):
                     self.dataset.append(data)                    
                 else:
                     # each person in the image
-                    for keypoint in keypoint_anns:
+                    for keypoint_ann in keypoint_anns:
                         # with enough keypoints
-                        if keypoint.get('num_keypoints') > keypoint_threshold:
-                            data = {'keypoint': keypoint.copy(), 'caption': caption_anns.copy(),
+                        if keypoint_ann.get('num_keypoints') > keypoint_threshold:
+                            data = {'keypoint': keypoint_ann.copy(), 'caption': caption_anns.copy(),
                                     'image': coco_keypoint.loadImgs(image_id)[0]}
 
                             # add sentence encoding
@@ -87,11 +87,13 @@ class HeatmapDataset(torch.utils.data.Dataset):
         data = self.dataset[index]
         item = dict()
 
-        if self.for_regression:
+        """if self.for_regression:
             item['coordinates'] = torch.tensor(get_augmented_coordinates(data.get('keypoint')), dtype=torch.float32)
         else:
             # change heatmap range from [0,1] to[-1,1]
-            item['heatmap'] = torch.tensor(self.get_heatmap(data) * 2 - 1, dtype=torch.float32)
+            item['heatmap'] = torch.tensor(self.get_heatmap(data) * 2 - 1, dtype=torch.float32)"""
+        # change heatmap range from [0,1] to[-1,1]
+        item['heatmap'] = torch.tensor(self.get_heatmap(data) * 2 - 1, dtype=torch.float32)
 
         if self.with_vector:
             # randomly select from all matching captions
@@ -128,6 +130,7 @@ class HeatmapDataset(torch.utils.data.Dataset):
 
         return {'heatmap': heatmap, 'caption': caption}
 
+    """完全沒用到R
     # get a batch of random coordinates and captions from the whole dataset
     def get_random_coordinates_with_caption(self, number):
         caption = []
@@ -139,7 +142,7 @@ class HeatmapDataset(torch.utils.data.Dataset):
             coordinates[i] = torch.tensor(get_augmented_coordinates(data.get('keypoint')), dtype=torch.float32)
             caption.append(random.choice(data.get('caption')).get('caption'))
 
-        return {'coordinates': coordinates, 'caption': caption}
+        return {'coordinates': coordinates, 'caption': caption}"""
 
     # get a batch of random interpolated caption sentence vectors from the whole dataset
     def get_interpolated_caption_tensor(self, number):
