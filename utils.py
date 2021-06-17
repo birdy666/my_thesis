@@ -17,106 +17,15 @@ def get_caption_vector(text_model, caption):
 
 
 # get a batch of noise vectors
-def get_noise_tensor(number):
+def get_noise_tensor(batch_size):
     """number x 128 x 1 x 1"""
-    noise_tensor = torch.randn((number, noise_size, 1, 1), dtype=torch.float32)
+    noise_tensor = torch.randn((batch_size, noise_size, 1, 1), dtype=torch.float32)
     return noise_tensor
 
 
-# get max index of a pose
-def coordinates_to_max_index(x, y, v):
-    max_index = np.array([x, y]).transpose()
-
-    # set the invisible keypoints to the middle
-    max_index[v < 1] = [heatmap_size / 2, heatmap_size / 2]
-    return max_index
-
-
-# find the nearest neighbor distance of a heatmap in a list of heatmaps
-def nearest_neighbor(heatmap_max_index, heatmap_max_index_list):
-    distance = heatmap_distance(heatmap_max_index, heatmap_max_index_list[0])
-
-    # find nearest neighbor
-    for heatmap_max_index2 in heatmap_max_index_list[1:]:
-        new_distance = heatmap_distance(heatmap_max_index, heatmap_max_index2)
-        if new_distance < distance:
-            distance = new_distance
-    return distance
-
-
-# find the nearest neighbor of a heatmap in a list of heatmaps
-def nearest_neighbor_index(heatmap_max_index, heatmap_max_index_list):
-    distance = heatmap_distance(heatmap_max_index, heatmap_max_index_list[0])
-    index = 0
-
-    # find nearest neighbor
-    for i in range(len(heatmap_max_index_list)):
-        new_distance = heatmap_distance(heatmap_max_index, heatmap_max_index_list[i])
-        if new_distance < distance:
-            distance = new_distance
-            index = i
-    return index
-
-
-# calculate the mean distance of a heatmap to a list of heatmaps
-def mean_distance(heatmap_max_index, heatmap_max_index_list):
-    distance = []
-
-    # calculate distances
-    for heatmap_max_index2 in heatmap_max_index_list:
-        distance.append(heatmap_distance(heatmap_max_index, heatmap_max_index2))
-
-    return np.mean(distance)
-
-
-# calculate the mean distance of a vector to a list of vectors
-def mean_vector_distance(vector, vector_list):
-    distance = []
-
-    # calculate distances
-    for vector2 in vector_list:
-        distance.append(np.sqrt(np.sum((vector - vector2) ** 2)))
-
-    return np.mean(distance)
-
-
-# find the nearest neighbor of a vector in a list of vectors
-def vector_nearest_neighbor_index(vector, vector_list):
-    distance = np.sqrt(np.sum((vector - vector_list[0]) ** 2))
-    index = 0
-
-    # find nearest neighbor
-    for i in range(len(vector_list)):
-        new_distance = np.sqrt(np.sum((vector - vector_list[i]) ** 2))
-        if new_distance < distance:
-            distance = new_distance
-            index = i
-    return index
-
-
-# calculate the one-nearest-neighbor accuracy
-def one_nearest_neighbor(heatmap_max_index_list, heatmap_max_index_list2):
-    size = len(heatmap_max_index_list)
-
-    # number of correct classifications
-    count = 0
-    for i in range(size):
-        # a heatmap from the first list
-        if nearest_neighbor(heatmap_max_index_list[i],
-                            heatmap_max_index_list[0:i] + heatmap_max_index_list[i + 1:]) < nearest_neighbor(
-            heatmap_max_index_list[i], heatmap_max_index_list2):
-            count = count + 1
-
-        # a heatmap from the second list
-        if nearest_neighbor(heatmap_max_index_list2[i],
-                            heatmap_max_index_list2[0:i] + heatmap_max_index_list2[i + 1:]) < nearest_neighbor(
-            heatmap_max_index_list2[i], heatmap_max_index_list):
-            count = count + 1
-
-    # accuracy
-    return count / size / 2
-
-
+"""
+Heatmap
+"""
 # return coordinates of keypoints in the heatmap and visibility
 def get_coordinates(keypoint_ann, full_image=False, img_size=None, augment=False):
     """
@@ -189,55 +98,9 @@ def augment_coordinates(x, y, v):
 
     return x, y, v
 
-""" 這只用在heatmap.py的兩個地方，其中一個是要在regression條件之下，另一個則是沒用到
-為啥我要把這個註銷調ㄋ 因為這名子她媽娶得太爛 應該要給那個augment_heatmap用才對吧 ???
-augment_heatmap 是沙小 
-# return coordinates of keypoints in the heatmap and visibility with augmentation
-def get_augmented_coordinates(keypoint_ann):
-    # coordinates and visibility before augmentation
-    x, y, v = get_coordinates(keypoint_ann)
-
-    # random flip, rotation, scaling, translation
-    f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
-    x, y, v = augment_heatmap(x, y, v, heatmap_size, f, r, s, tx, ty)
-
-    # set invisible keypoint coordinates as (0,0)
-    x[v < 1] = 0
-    y[v < 1] = 0
-
-    # concatenate the coordinates and visibility
-    return np.concatenate([x, y, v])"""
-
-
-"""沒用到# seperate coordinates and visibility from an array
-def result_to_coordinates(result):
-    x = result[0:total_keypoints]
-    y = result[total_keypoints:2 * total_keypoints]
-    v = (np.sign(result[2 * total_keypoints:3 * total_keypoints] - v_threshold) + 1) / 2
-    return x, y, v"""
-
-"""
-Heatmap
-"""
-
-# distance between two heatmaps: the sum of the distances between maximum points of all 17 keypoint heatmaps
-def heatmap_distance(heatmap_max_index, heatmap_max_index2):
-    return sum(np.sqrt(np.sum((heatmap_max_index - heatmap_max_index2) ** 2, axis=1)))
-
-
-# get max index of a heatmap
-def heatmap_to_max_index(heatmap):
-    max_index = np.array([np.unravel_index(np.argmax(h), h.shape) for h in heatmap])
-
-    # set the index of heatmap below threshold to the middle
-    for i in range(len(heatmap)):
-        if heatmap[i][tuple(max_index[i])] < heatmap_threshold:
-            max_index[i][:] = heatmap_size / 2
-    return max_index
-
 
 # return ground truth heatmap of a training sample (fixed-sized square-shaped, can be augmented)
-def get_heatmap(keypoint_ann, augment=True):
+def get_single_person_heatmap(keypoint_ann, augment=True):
     # x-y grids
     x_grid = np.repeat(np.array([range(heatmap_size)]), heatmap_size, axis=0)
     y_grid = np.repeat(np.array([range(heatmap_size)]).transpose(), heatmap_size, axis=1)
@@ -289,9 +152,6 @@ def get_full_image_heatmap(image, keypoint_anns, augment=True):
 
     # sum individual heatmaps
     return heatmap.sum(axis=0).clip(0, 1)
-
-
-
 
 
 """
@@ -363,6 +223,7 @@ def plot_heatmap(heatmap, skeleton=None, image_path=None, caption=None, only_ske
         plt.title('stacked heatmaps' + (' and skeleton' if skeleton is not None else ''))
         plt.xlabel(caption)
 
+
 # plot a pose
 def plot_pose(x, y, v, skeleton, caption=None):
     # visible keypoints
@@ -403,3 +264,151 @@ def plot_generative_samples_from_noise(fixed_fake, fixed_real_array, fixed_capti
         plt.yticks([])
     plt.savefig(figures_path + 'fixed_noise_samples_' + f'{start_from_epoch:05d}' + '_new.png')
     plt.close()
+
+
+
+
+
+
+"""
+# get max index of a pose
+def coordinates_to_max_index(x, y, v):
+    max_index = np.array([x, y]).transpose()
+
+    # set the invisible keypoints to the middle
+    max_index[v < 1] = [heatmap_size / 2, heatmap_size / 2]
+    return max_index
+
+
+# calculate the mean distance of a vector to a list of vectors
+def mean_vector_distance(vector, vector_list):
+    distance = []
+
+    # calculate distances
+    for vector2 in vector_list:
+        distance.append(np.sqrt(np.sum((vector - vector2) ** 2)))
+
+    return np.mean(distance)
+
+
+# find the nearest neighbor of a vector in a list of vectors
+def vector_nearest_neighbor_index(vector, vector_list):
+    distance = np.sqrt(np.sum((vector - vector_list[0]) ** 2))
+    index = 0
+
+    # find nearest neighbor
+    for i in range(len(vector_list)):
+        new_distance = np.sqrt(np.sum((vector - vector_list[i]) ** 2))
+        if new_distance < distance:
+            distance = new_distance
+            index = i
+    return index
+
+
+# calculate the one-nearest-neighbor accuracy
+def one_nearest_neighbor(heatmap_max_index_list, heatmap_max_index_list2):
+    size = len(heatmap_max_index_list)
+
+    # number of correct classifications
+    count = 0
+    for i in range(size):
+        # a heatmap from the first list
+        if nearest_neighbor(heatmap_max_index_list[i],
+                            heatmap_max_index_list[0:i] + heatmap_max_index_list[i + 1:]) < nearest_neighbor(
+            heatmap_max_index_list[i], heatmap_max_index_list2):
+            count = count + 1
+
+        # a heatmap from the second list
+        if nearest_neighbor(heatmap_max_index_list2[i],
+                            heatmap_max_index_list2[0:i] + heatmap_max_index_list2[i + 1:]) < nearest_neighbor(
+            heatmap_max_index_list2[i], heatmap_max_index_list):
+            count = count + 1
+
+    # accuracy
+    return count / size / 2
+
+"""
+
+
+"""
+# distance between two heatmaps: the sum of the distances between maximum points of all 17 keypoint heatmaps
+def heatmap_distance(heatmap_max_index, heatmap_max_index2):
+    return sum(np.sqrt(np.sum((heatmap_max_index - heatmap_max_index2) ** 2, axis=1)))
+
+
+# get max index of a heatmap
+def heatmap_to_max_index(heatmap):
+    max_index = np.array([np.unravel_index(np.argmax(h), h.shape) for h in heatmap])
+
+    # set the index of heatmap below threshold to the middle
+    for i in range(len(heatmap)):
+        if heatmap[i][tuple(max_index[i])] < heatmap_threshold:
+            max_index[i][:] = heatmap_size / 2
+    return max_index
+
+
+# find the nearest neighbor distance of a heatmap in a list of heatmaps
+def nearest_neighbor(heatmap_max_index, heatmap_max_index_list):
+    distance = heatmap_distance(heatmap_max_index, heatmap_max_index_list[0])
+
+    # find nearest neighbor
+    for heatmap_max_index2 in heatmap_max_index_list[1:]:
+        new_distance = heatmap_distance(heatmap_max_index, heatmap_max_index2)
+        if new_distance < distance:
+            distance = new_distance
+    return distance
+
+
+# find the nearest neighbor of a heatmap in a list of heatmaps
+def nearest_neighbor_index(heatmap_max_index, heatmap_max_index_list):
+    distance = heatmap_distance(heatmap_max_index, heatmap_max_index_list[0])
+    index = 0
+
+    # find nearest neighbor
+    for i in range(len(heatmap_max_index_list)):
+        new_distance = heatmap_distance(heatmap_max_index, heatmap_max_index_list[i])
+        if new_distance < distance:
+            distance = new_distance
+            index = i
+    return index
+
+
+# calculate the mean distance of a heatmap to a list of heatmaps
+def mean_distance(heatmap_max_index, heatmap_max_index_list):
+    distance = []
+
+    # calculate distances
+    for heatmap_max_index2 in heatmap_max_index_list:
+        distance.append(heatmap_distance(heatmap_max_index, heatmap_max_index2))
+
+    return np.mean(distance)
+"""
+
+
+
+
+""" 這只用在heatmap.py的兩個地方，其中一個是要在regression條件之下，另一個則是沒用到
+
+# return coordinates of keypoints in the heatmap and visibility with augmentation
+def get_augmented_coordinates(keypoint_ann):
+    # coordinates and visibility before augmentation
+    x, y, v = get_coordinates(keypoint_ann)
+
+    # random flip, rotation, scaling, translation
+    f, r, s, tx, ty = get_augment_parameters(flip, scale, rotate, translate)
+    x, y, v = augment_heatmap(x, y, v, heatmap_size, f, r, s, tx, ty)
+
+    # set invisible keypoint coordinates as (0,0)
+    x[v < 1] = 0
+    y[v < 1] = 0
+
+    # concatenate the coordinates and visibility
+    return np.concatenate([x, y, v])"""
+
+
+"""沒用到# seperate coordinates and visibility from an array
+def result_to_coordinates(result):
+    x = result[0:total_keypoints]
+    y = result[total_keypoints:2 * total_keypoints]
+    v = (np.sign(result[2 * total_keypoints:3 * total_keypoints] - v_threshold) + 1) / 2
+    return x, y, v"""

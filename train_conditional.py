@@ -126,7 +126,7 @@ torch.save(net_d.state_dict(), discriminator_path + '_' + f'{start_from_epoch:05
 net_g.eval()
 with torch.no_grad():
     """
-    每個row有5張對應到不同語句的假pose，用的都是同樣的noise。所以這裡用repeat_interleave(5, dim=1)
+    每個row有5張對應到不同語句的假pose，用的都是同樣的noise。所以這裡用repeat_interleave(5, dim=0)
     每個text會場生6張假pose，所以用repeat(6, 1, 1, 1))
     """
     fixed_fake = net_g(fixed_noise.repeat_interleave(fixed_w, dim=0), fixed_text.repeat(fixed_h, 1, 1, 1))

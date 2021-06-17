@@ -81,7 +81,7 @@ class HeatmapDataset(torch.utils.data.Dataset):
         if self.full_image:
             return get_full_image_heatmap(data.get('image'), data.get('keypoints'), augment)
         else:
-            return get_heatmap(data.get('keypoint'), augment)
+            return get_single_person_heatmap(data.get('keypoint'), augment)
 
     def __getitem__(self, index):
         data = self.dataset[index]
@@ -99,6 +99,7 @@ class HeatmapDataset(torch.utils.data.Dataset):
             # randomly select from all matching captions
             item['vector'] = torch.tensor(random.choice(data.get('vector')), dtype=torch.float32)
             if not self.for_regression:
+                """unsqueeze_ 是in place operation, unsqueeze不是"""
                 item['vector'].unsqueeze_(-1).unsqueeze_(-1)
         return item
 
@@ -145,11 +146,11 @@ class HeatmapDataset(torch.utils.data.Dataset):
         return {'coordinates': coordinates, 'caption': caption}"""
 
     # get a batch of random interpolated caption sentence vectors from the whole dataset
-    def get_interpolated_caption_tensor(self, number):
-        vector_tensor = torch.empty((number, sentence_vector_size), dtype=torch.float32)
+    def get_interpolated_caption_tensor(self, batch_size):
+        vector_tensor = torch.empty((batch_size, sentence_vector_size), dtype=torch.float32)
 
         if self.with_vector:
-            for i in range(number):
+            for i in range(batch_size):
                 # randomly select 2 captions from all captions
                 vector = random.choice(random.choice(self.dataset).get('vector'))
                 vector2 = random.choice(random.choice(self.dataset).get('vector'))
