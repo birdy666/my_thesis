@@ -114,4 +114,5 @@ if __name__ == '__main__':
     print("555")
     renderer.setRenderMode('geo')
     renderer.offscreenMode(True)
-    visEFT_singleSubject(renderer)
+    print("teeeeeeeee")
+    #visEFT_singleSubject(renderer)
