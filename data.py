@@ -61,24 +61,17 @@ def getData(cfg):
     """
     print("create dataloaders")
     # get the dataset (single person, with captions)
-    dataset = TheDataset(cfg, eft_all_with_caption, coco_caption, text_model=text_model, val=False)
-    dataset_val = TheDataset(cfg, eft_all_with_caption, coco_caption, text_model=text_model, val=True)
-
-    # data loader, containing heatmap information
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=workers)
-
-    """# data to validate
-    data_val = enumerate(torch.utils.data.DataLoader(dataset_val, batch_size=dataset_val.__len__())).__next__()[1]
-    text_match_val = data_val.get('vector').to(device)
-    label_val = torch.full((len(dataset_val),), 1, dtype=torch.float32, device=device)"""
-
+    train_size = int(len(eft_all_with_caption)*0.9)
+    dataset_train = TheDataset(cfg, eft_all_with_caption[:train_size], coco_caption, text_model=text_model)
+    dataset_val = TheDataset(cfg, eft_all_with_caption[train_size:], coco_caption, text_model=text_model)
+    
     #return text_model, dataset, dataset_val, data_loader#, text_match_val, label_val
-    return text_model, data_loader
+    return text_model, eft_all_with_caption, dataset_train, dataset_val
 
 
 
 class FixedData():
-    def __init__(self, device):
+    def __init__(self, dataset_val, text_model, device):
         # fixed training data (from validation set), noise and sentence vectors to see the progression
         self.h = 6
         self.w = 5
@@ -117,7 +110,7 @@ class TheDataset(torch.utils.data.Dataset):
         # change heatmap range from [0,1] to[-1,1]
         item['parm_pose'] = torch.tensor(data['parm_pose'], dtype=torch.float32)
 
-        item['vector'] = torch.tensor(data['caption'], dtype=torch.float32)
+        item['vector'] = torch.tensor(data['vector'], dtype=torch.float32)
         """unsqueeze_ is in place operation, unsqueeze isn't"""
         item['vector'].unsqueeze_(-1).unsqueeze_(-1)
             
@@ -174,14 +167,13 @@ if __name__ == "__main__":
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
     # load text encoding model
-    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
+    #text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
     
     eft_all_with_caption = getEFTCaption(cfg, coco_caption)
-    print(eft_all_with_caption[0]['parm_pose'][0])
-    """
-    取得dataset
-    """
-    print("create dataloaders")
-    # get the dataset (single person, with captions)
-    dataset = TheDataset(cfg, eft_all_with_caption, coco_caption, text_model=text_model, val=False)
-    print(dataset.dataset[0])
+    print(eft_all_with_caption[0].keys())
+    """dataset_train = TheDataset(cfg, eft_all_with_caption[:100], coco_caption, text_model=text_model)
+    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
+    for step, item in enumerate(dataLoader_train):
+        print(step, item)
+        break
+    print(dataLoader_train)"""

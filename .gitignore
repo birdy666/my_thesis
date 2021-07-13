@@ -3,3 +3,4 @@
 /.ipynb_checkpoints
 /DF-GAN
 /models/__pycache__
+/renderer/__pycache__

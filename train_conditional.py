@@ -11,7 +11,7 @@ from heatmap import HeatmapDataset
 from path import *
 from utils import *
 
-workers = 8
+
 
 # whether multi-person
 multi = False
