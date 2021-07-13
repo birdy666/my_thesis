@@ -6,9 +6,10 @@ import json
 import os
 import random
 
-from config import cfg
+from geometry import rotation2so3
 from utils import get_noise_tensor, get_caption_vector
 from models.smpl import SMPL
+from config import cfg
 
 def getEFTCaption(cfg, coco_caption):
     #data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
@@ -96,14 +97,15 @@ class TheDataset(torch.utils.data.Dataset):
         self.cfg = cfg
 
         for i in range(len(eft_all_with_caption)):
-            data = {'caption': coco_caption.loadAnns(eft_all_with_caption[i]['annotId'])[0],
+            data = {'caption': coco_caption.loadAnns(eft_all_with_caption[i]['annotId'])[0]['caption'],
                     'parm_pose': eft_all_with_caption[i]['parm_pose'],
                     'parm_shape': eft_all_with_caption[i]['parm_shape'],
                     'smpltype': eft_all_with_caption[i]['smpltype']}
+            data['so3'] = [rotation2so3(R) for R in data['parm_pose']]
             # add sentence encoding
             if text_model is not None:
                 data['vector'] = get_caption_vector(cfg, text_model, data['caption'])
-                self.dataset,np.append(data)
+                self.dataset.append(data)
       
     
     def __len__(self):
@@ -123,7 +125,7 @@ class TheDataset(torch.utils.data.Dataset):
 
     # get a batch of random caption sentence vectors from the whole dataset
     def get_random_caption_tensor(self, number):
-        vector_tensor = torch.empty((number, self.cfg.sentence_vector_size), dtype=torch.float32)
+        vector_tensor = torch.empty((number, self.cfg.SENTENCE_VECTOR_SIZE), dtype=torch.float32)
 
         for i in range(number):
             # randomly select from all captions
@@ -168,10 +170,18 @@ if __name__ == "__main__":
 
     x = {'a':1,'b':2}
     print(x.get('b'))
-    """coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
+    # read captions and keypoints from files
+    coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
-   
+    # load text encoding model
+    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
     
     eft_all_with_caption = getEFTCaption(cfg, coco_caption)
-    ann = coco_caption.loadAnns(eft_all_with_caption[0]['annotId'])[0]
-    print(ann)"""
+    print(eft_all_with_caption[0]['parm_pose'][0])
+    """
+    取得dataset
+    """
+    print("create dataloaders")
+    # get the dataset (single person, with captions)
+    dataset = TheDataset(cfg, eft_all_with_caption, coco_caption, text_model=text_model, val=False)
+    print(dataset.dataset[0])

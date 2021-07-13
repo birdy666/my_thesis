@@ -13,7 +13,7 @@ from path import *
 
 # return the caption encoding
 def get_caption_vector(cfg, text_model, caption):
-    return text_model.get_sentence_vector(caption.replace('\n', '').lower()) * cfg.encoding_weight
+    return text_model.get_sentence_vector(caption.replace('\n', '').lower()) * cfg.ENCODING_WEIGHT
 
 
 # get a batch of noise vectors

@@ -26,14 +26,29 @@ __C.EFT_FIT_WITH_CAPTION_PATH = chang + '/eft/eft_fit/COCO2014-All-ver01_with_ca
 
 # text model
 __C.TEXT_MODEL_PATH = chang + '/fastText/wiki.en.bin'
-__C.encoding_weight = 30
-__C.sentence_vector_size = 300
+__C.ENCODING_WEIGHT = 30
+__C.SENTENCE_VECTOR_SIZE = 300
 
 # smpl
 __C.SMPL_MODEL_PATH = chang + "/datasets/smpl/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
 
 # training
 __C.BATCH_SIZE = 128
+__C.LEARNING_RATE_G = 0.0004
+__C.LEARNING_RATE_D = 0.0004
+__C.START_FROM_EPOCH = 0#200
+__C.END_IN_EPOCH = 1#1200
+__C.NOISE_SIZE = 128
+__C.COMPRESS_SIZE = 128
+# ADAM solver
+__C.BETA_1 = 0.0
+__C.BETA_2 = 0.9
+# numbers of channels of the convolutions
+__C.CONVOLUTION_CHANNEL_G = [256, 128, 64, 32]
+__C.CONVOLUTION_CHANNEL_D = [32, 64, 128, 256]
+
+__C.GENERATOR_PATH = chang + '/z_master-thesis/models/generator'
+__C.DISCRIMINATOR_PATH = chang + '/z_master-thesis/models/discriminator'
 
 
 """# Dataset name: flowers, birds
