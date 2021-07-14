@@ -9,25 +9,14 @@ import numpy as np
 
 from heatmap import HeatmapDataset
 from path import *
-from utils import *
-
-
-
-# whether multi-person
-multi = False
-
-# training parameters
-batch_size = 128
-learning_rate_g = 0.0004
-learning_rate_d = 0.0004
-
+from utils import get_noise_tensor
 
 # algorithms: gan, wgan, wgan-gp, wgan-lp
 # gan: k = 1, beta_1 = 0.5, beta_2 = 0.999, lr = 0.0001, epoch = 50~300
 # wgan: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.001, c = 0.01, epoch = 200~1200
 # wgan-gp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 20, epoch = 200~1200
 # wgan-lp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 150, epoch = 200~1200
-algorithm = 'wgan-gp'
+algorithm = 'wgan'
 
 # weight clipping (WGAN)
 c = 0.01
@@ -41,9 +30,6 @@ alpha = 1
 # train discriminator k times before training generator
 k = 5
 
-# ADAM solver
-beta_1 = 0.0
-beta_2 = 0.9
 
 
 def getLoss(net_g, net_d, criterion, dataset_val, heatmap_real_val, text_match_val, label_val):
@@ -123,9 +109,9 @@ def saveModel_plotGenerative(net_g, net_d, fixedData, suffix, skeleton):
         fixed_fake = net_g(fixedData.noise.repeat_interleave(fixedData.w, dim=0), fixedData.text.repeat(fixedData.h, 1, 1, 1))
     plot_generative_samples_from_noise(fixed_fake, fixedData.real_array, fixedData.caption, fixedData.w, fixedData.h, multi, skeleton, start_from_epoch)
 
-def train(net_g, net_d, optimizer_g, optimizer_d, criterion, fixedData):   
+def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train):   
     
-    saveModel_plotGenerative(net_g, net_d, fixedData, f'{start_from_epoch:05d}' + '_new', skeleton)
+    #saveModel_plotGenerative(net_g, net_d, fixedData, f'{start_from_epoch:05d}' + '_new', skeleton)
     # train
     start = datetime.now()
     print(start)
@@ -138,13 +124,13 @@ def train(net_g, net_d, optimizer_g, optimizer_d, criterion, fixedData):
     loss_d = torch.tensor(0)
 
     # number of batches
-    batch_number = len(data_loader)
+    batch_number = len(dataLoader_train)
 
-    for e in range(start_from_epoch, end_in_epoch):
+    for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):
         print('learning rate: g ' + str(optimizer_g.param_groups[0].get('lr')) + ' d ' + str(
             optimizer_d.param_groups[0].get('lr')))
 
-        for i, batch in enumerate(data_loader, 0):
+        for i, batch in enumerate(dataLoader_train, 0):
             net_g.train()
             net_d.train()
             ############################
@@ -157,7 +143,7 @@ def train(net_g, net_d, optimizer_g, optimizer_d, criterion, fixedData):
             text_match = batch.get('vector').to(device)
             current_batch_size = len(heatmap_real)
             text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
-            noise = get_noise_tensor(current_batch_size).to(device)
+            noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)
 
             """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
             fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""

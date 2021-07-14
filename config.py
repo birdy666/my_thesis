@@ -12,6 +12,10 @@ cfg = __C
 
 __C.CUDA = True
 
+
+__C.START_FROM_EPOCH = 0#200
+__C.END_IN_EPOCH = 1#1200
+
 # coco
 __C.DATA_DIR = chang + "/datasets/coco"
 __C.DATASET_NAME = 'coco'
@@ -36,11 +40,10 @@ __C.SMPL_MODEL_PATH = chang + "/datasets/smpl/basicModel_neutral_lbs_10_207_0_v1
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 0.0004
 __C.LEARNING_RATE_D = 0.0004
-__C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 1#1200
 __C.NOISE_SIZE = 128
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
+__C.JOINT_NUM = 24
 # ADAM solver
 __C.BETA_1 = 0.0
 __C.BETA_2 = 0.9

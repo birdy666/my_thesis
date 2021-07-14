@@ -14,7 +14,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if __name__ == "__main__":
     text_model, eft_all_with_caption, dataset_train, dataset_val = getData(cfg)
     net_g, net_d = getModels(cfg, device, algorithm='wgan')
-    fixedData = FixedData(dataset_val, text_model, device)    
+    #fixedData = FixedData(dataset_val, text_model, device)    
 
     # data loader, containing heatmap information
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
@@ -27,4 +27,4 @@ if __name__ == "__main__":
     optimizer_g = optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2))
     optimizer_d = optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2))
     criterion = nn.BCELoss()
-    train(cfg, device)
+    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train)

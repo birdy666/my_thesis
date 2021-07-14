@@ -97,7 +97,7 @@ class TheDataset(torch.utils.data.Dataset):
             data['so3'] = [rotation2so3(R) for R in data['parm_pose']]
             # add sentence encoding
             if text_model is not None:
-                data['vector'] = get_caption_vector(cfg, text_model, data['caption'])
+                data['vector'] = get_caption_vector(text_model, data['caption'], cfg.ENCODING_WEIGHT)
                 self.dataset.append(data)
       
     
