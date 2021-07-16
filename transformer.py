@@ -4,17 +4,32 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
+"""d_word_vec=512, 
+d_model=512, 
+d_inner=2048,
+n_layers=6, 
+n_head=8, 
+d_k=64, 
+d_v=64, 
+dropout=0.1, 
+n_position=200
+
+Word embedding 把單字轉成512維的向量 a
+q = a*W_q    a是1x512, W_q是512x64 所以q是1x64
+k同理
+"""
+
 class ScaledDotProductAttention(nn.Module):
     ''' Scaled Dot-Product Attention '''
 
     def __init__(self, temperature, attn_dropout=0.1):
         super().__init__()
-        # square root of d_k used to scale down the matmul of Q,K  to counter exploding gradients.
+        # square root of d_k 
         self.temperature = temperature
         self.dropout = nn.Dropout(attn_dropout)
 
     def forward(self, q, k, v, mask=None):
-
+        # temperature here is used to scale down the matmul of Q,K  to counter exploding gradients.
         attn = torch.matmul(q / self.temperature, k.transpose(2, 3))
 
         if mask is not None:
@@ -34,8 +49,11 @@ class MultiHeadAttention(nn.Module):
         self.n_head = n_head
         # dk is the dimension of queries (Q) and keys(K)
         self.d_k = d_k
+        # 照理說V德對不是應該和QK一樣嗎
         self.d_v = d_v
 
+        # 多頭的attention基本上就是有n個q, s
+        # nn.Linear(512, 8 * 64, bias=False)
         self.w_qs = nn.Linear(d_model, n_head * d_k, bias=False)
         self.w_ks = nn.Linear(d_model, n_head * d_k, bias=False)
         self.w_vs = nn.Linear(d_model, n_head * d_v, bias=False)
@@ -175,3 +193,13 @@ class Encoder(nn.Module):
         if return_attns:
             return enc_output, enc_slf_attn_list
         return enc_output,
+
+
+
+if __name__ == "__main__":
+    
+    w_qs = nn.Linear(5, 5 * 6, bias=False)
+
+    a = torch.tensor([1,2])
+    b = torch.tensor([2,3])
+    print(torch.matmul(a,b))
