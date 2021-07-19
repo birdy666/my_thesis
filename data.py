@@ -6,13 +6,20 @@ import json
 import os
 import random
 
+import cv2
+
+from skimage import io
+from matplotlib import pyplot as plt
+import string
+
+
 from geometry import rotation2so3
 from utils import get_noise_tensor, get_caption_vector
 from models.smpl import SMPL
 from config import cfg
 
-def getEFTCaption(cfg, coco_caption):
-    #data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
+
+#data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
     #data['parm_shape']       #10 dim vector
     #data['parm_cam']        #weak-perspective projection: [cam_scale, cam_transX, cam_tranY]
     #data['bbox_scale']     #float
@@ -24,6 +31,8 @@ def getEFTCaption(cfg, coco_caption):
 
     #data['subjectId']          #(optional) a unique id per sequence. usually {seqName}_{id}
     #Load EFT fitting data
+
+def getEFTCaption(cfg, coco_caption):
     if os.path.isfile(cfg.EFT_FIT_WITH_CAPTION_PATH):
         with open(cfg.EFT_FIT_WITH_CAPTION_PATH,'r') as f:
             eft_all_with_caption = json.load(f)
@@ -32,15 +41,16 @@ def getEFTCaption(cfg, coco_caption):
         with open(cfg.EFT_FIT_PATH,'r') as f:
             eft_data = json.load(f)
             print("EFT data: ver {}".format(eft_data['ver']))
-        
+
             eft_data_all = eft_data['data']
         print(len(eft_data_all))    
 
         # Not all the annotID in eft_all are also in caption_train2014, need to filter them out
-        annids = coco_caption.getAnnIds()
+        annids_captopn = coco_caption.getAnnIds()
+        #annids_keypoints=coco_keypoints.getAnnIds()
         eft_all_with_caption = []
         for i in range(len(eft_data_all)):
-            if eft_data_all[i]['annotId'] in annids:
+            if eft_data_all[i]['annotId'] in annids_captopn:
                 eft_all_with_caption.append(eft_data_all[i])
         print(len(eft_all_with_caption))
         with open(cfg.EFT_FIT_WITH_CAPTION_PATH, 'w') as f:
@@ -88,17 +98,21 @@ class TheDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, eft_all_with_caption, coco_caption, text_model=None, val=False):
         self.dataset = []
         self.cfg = cfg
-
         for i in range(len(eft_all_with_caption)):
             data = {'caption': coco_caption.loadAnns(eft_all_with_caption[i]['annotId'])[0]['caption'],
                     'parm_pose': eft_all_with_caption[i]['parm_pose'],
                     'parm_shape': eft_all_with_caption[i]['parm_shape'],
-                    'smpltype': eft_all_with_caption[i]['smpltype']}
+                    'smpltype': eft_all_with_caption[i]['smpltype'],
+                    'annotId': eft_all_with_caption[i]['annotId'],
+                    'imageName': eft_all_with_caption[i]['imageName']}
             data['so3'] = [rotation2so3(R) for R in data['parm_pose']]
             # add sentence encoding
             if text_model is not None:
-                data['vector'] = get_caption_vector(text_model, data['caption'], cfg.ENCODING_WEIGHT)
-                self.dataset.append(data)
+                # 加這一行資料量從19116 變 19083 但可以刷掉一些感覺就跟人沒有關的怪異資料
+                caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
+                if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
+                    data['vector'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN)
+                    self.dataset.append(data)
       
     
     def __len__(self):
@@ -159,21 +173,8 @@ class TheDataset(torch.utils.data.Dataset):
             return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
 """
 if __name__ == "__main__":
-    print("haha")
-
-    x = {'a':1,'b':2}
-    print(x.get('b'))
-    # read captions and keypoints from files
-    coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
-    # load text encoding model
-    #text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
-    
-    eft_all_with_caption = getEFTCaption(cfg, coco_caption)
-    print(eft_all_with_caption[0].keys())
-    """dataset_train = TheDataset(cfg, eft_all_with_caption[:100], coco_caption, text_model=text_model)
-    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
-    for step, item in enumerate(dataLoader_train):
-        print(step, item)
-        break
-    print(dataLoader_train)"""
+    x = np.array([1,1,1])
+    def a(Li):
+        Li = Li.copy()*2
+    a(x)
+    print(x)

@@ -21,6 +21,7 @@ __C.DATA_DIR = chang + "/datasets/coco"
 __C.DATASET_NAME = 'coco'
 __C.COCO_CAPTION_TRAIN = __C.DATA_DIR + '/annotations/captions_train2014.json'
 __C.COCO_CAPTION_VAL = __C.DATA_DIR + '/annotations/captions_val2014.json'
+__C.COCO_keypoints_TRAIN = __C.DATA_DIR + '/annotations/person_keypoints_train2014.json'
 __C.COCO_VAL_PORTION = 0.1
 
 # EFT
@@ -44,6 +45,19 @@ __C.NOISE_SIZE = 128
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
 __C.JOINT_NUM = 24
+__C.MAX_SENTENCE_LEN = 24
+# Model
+__C.N_LAYERS = 3
+__C.D_INNER_SCALE = 2
+__C.D_WORD_VEC = 300
+__C.D_MODEL_LIST = [300,60,12] 
+__C.N_HEAD_LIST = [5,5,4]
+__C.D_K_LIST = [60,12,3]
+__C.D_V_LIST = [60,12,3]
+__C.DROPOUT = 0.1
+__C.N_POSITION = 200
+__C.SCALE_EMB = False
+
 # ADAM solver
 __C.BETA_1 = 0.0
 __C.BETA_2 = 0.9
