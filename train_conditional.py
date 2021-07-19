@@ -7,8 +7,6 @@ from torch.autograd import grad
 import torch
 import numpy as np
 
-from heatmap import HeatmapDataset
-from path import *
 from utils import get_noise_tensor
 
 # algorithms: gan, wgan, wgan-gp, wgan-lp
@@ -119,7 +117,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
     net_g.train()
     net_d.train()
     iteration = 1
-    writer = SummaryWriter(comment='_caption_' + ('multi_' if multi else '') + algorithm)
+    writer = SummaryWriter(comment='_caption_'  + algorithm)
     loss_g = torch.tensor(0)
     loss_d = torch.tensor(0)
 
@@ -142,6 +140,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
             heatmap_real = batch.get('heatmap').to(device)
             text_match = batch.get('vector').to(device)
             current_batch_size = len(heatmap_real)
+            """搞不好隨便取取到對的?"""
             text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
             noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)
 

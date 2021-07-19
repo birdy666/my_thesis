@@ -44,6 +44,12 @@ class Generator(nn.Module):
         enc_output = input_vec
         return enc_output
 
+class Discriminator(nn.Module):
+    def __init__(self, cfg):
+        """連架構都還沒想好R 感覺這裡是不是相較隨興 反正中間加入word vec最後輸出Y/N 就好惹"""
+        pass
+
+
 if __name__ == "__main__":
     a = [1,2,3,4]
     print([i*2 for i in a])
