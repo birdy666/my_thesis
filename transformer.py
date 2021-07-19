@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+import os
 
 """d_word_vec=512, 
 d_model=512, 
@@ -167,5 +168,7 @@ class PositionalEncoding(nn.Module):
 
 
 if __name__ == "__main__":
-    a = np.array([1,1,1,1,2,2,2,2,3,3,3,3])
-    print(a.reshape(3,4))
+    print(os.path.isfile('renderer/glRenderer.py'))
+    current_dir = os.path.dirname(__file__)
+    print(current_dir)
+    print(os.path.dirname(current_dir))

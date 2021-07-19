@@ -112,8 +112,7 @@ class TheDataset(torch.utils.data.Dataset):
                 caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
                 if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
                     data['vector'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN)
-                    self.dataset.append(data)
-      
+                    self.dataset.append(data)      
     
     def __len__(self):
         return len(self.dataset)

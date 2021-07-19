@@ -12,7 +12,7 @@ class Generator(nn.Module):
         self.cfg = cfg
         self.position_enc = PositionalEncoding(cfg.D_WORD_VEC, n_position=cfg.N_POSITION)
         self.dropout = nn.Dropout(p=cfg.DROPOUT)
-        
+        self.layer_norm = nn.LayerNorm(cfg.D_MODEL_LIST[0], eps=1e-6)
         self.encoder_stack = nn.ModuleList([
                                             EncoderLayer(d_model=cfg.D_MODEL_LIST[i], 
                                                         d_inner=cfg.D_MODEL_LIST[i] * cfg.D_INNER_SCALE, 
@@ -22,7 +22,7 @@ class Generator(nn.Module):
                                                         dropout=cfg.DROPOUT)
                                                         for i in range(cfg.N_LAYERS)])
         
-        self.layer_norm = nn.LayerNorm(cfg.D_MODEL_LIST[0], eps=1e-6)
+        
     
     """不知道mask要傳甚麼嗚嗚 TODO"""
     def forward(self, input_vec, src_mask, return_attns=False):
@@ -46,10 +46,23 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
     def __init__(self, cfg):
-        """連架構都還沒想好R 感覺這裡是不是相較隨興 反正中間加入word vec最後輸出Y/N 就好惹"""
-        pass
+        super().__init__()
+        self.cfg = cfg
+        self.position_enc = PositionalEncoding(cfg.D_WORD_VEC, n_position=cfg.N_POSITION)
+        self.dropout = nn.Dropout(p=cfg.DROPOUT)
+        self.layer_norm = nn.LayerNorm(cfg.D_MODEL_LIST[0], eps=1e-6)
+        self.encoder_stack = nn.ModuleList([
+                                            EncoderLayer(d_model=cfg.D_MODEL_LIST[i], 
+                                                        d_inner=cfg.D_MODEL_LIST[i] * cfg.D_INNER_SCALE, 
+                                                        n_head=cfg.N_HEAD_LIST[i], 
+                                                        d_k=cfg.D_K_LIST[i], 
+                                                        d_v=cfg.D_V_LIST[i], 
+                                                        dropout=cfg.DROPOUT)
+                                                        for i in range(cfg.N_LAYERS-1, 0-1, -1)])
 
 
 if __name__ == "__main__":
-    a = [1,2,3,4]
-    print([i*2 for i in a])
+    a = [1,2,3,4,5]
+    for i in range(4, 0-1, -1):
+        #print(i)
+        print(a[i])

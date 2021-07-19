@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
     # data loader, containing heatmap information
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
-
+    dataLoader_val = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=False)
     """# data to validate
     data_val = enumerate(torch.utils.data.DataLoader(dataset_val, batch_size=dataset_val.__len__())).__next__()[1]
     text_match_val = data_val.get('vector').to(device)
@@ -27,4 +27,4 @@ if __name__ == "__main__":
     optimizer_g = optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2))
     optimizer_d = optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2))
     criterion = nn.BCELoss()
-    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train)
+    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val)
