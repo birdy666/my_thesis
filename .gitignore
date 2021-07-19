@@ -1,6 +1,3 @@
-/__pycache__
 /.config
 /.ipynb_checkpoints
-/DF-GAN
-/models/__pycache__
-/renderer/__pycache__
+__pycache__/
