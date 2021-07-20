@@ -1,10 +1,10 @@
-from model import Generator2, Discriminator2, weights_init
-
 import time
 from torch.autograd import grad
 import torch
 import numpy as np
 import os
+from tqdm import tqdm
+from time import sleep
 
 from utils import get_noise_tensor
 
@@ -39,133 +39,136 @@ def saveModel_plotGenerative(net_g, net_d, fixedData, suffix, skeleton):
         fixed_fake = net_g(fixedData.noise.repeat_interleave(fixedData.w, dim=0), fixedData.text.repeat(fixedData.h, 1, 1, 1))
     plot_generative_samples_from_noise(fixed_fake, fixedData.real_array, fixedData.caption, fixedData.w, fixedData.h, multi, skeleton, start_from_epoch)
 
+def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion):
+    net_d.train()
+    loss_d = torch.tensor(0)
+    net_d.zero_grad()
+
+    # get heatmaps, sentence vectors and noises
+    heatmap_real = batch.get('heatmap').to(device)
+    text_match = batch.get('vector').to(device)
+    current_batch_size = len(heatmap_real)
+    """搞不好隨便取取到對的?"""
+    text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
+    noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)
+
+    """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
+    fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
+    # discriminate heatmpap-text pairs
+    score_right = net_d(heatmap_real, text_match)
+    score_wrong = net_d(heatmap_real, text_mismatch)
+
+    # generate heatmaps
+    heatmap_fake = net_g(noise, text_match).detach()
+    # discriminate heatmpap-text pairs
+    score_fake = net_d(heatmap_fake, text_match)
+
+    if algorithm == 'gan':
+        # torch.full(size, fill_value, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
+        label = torch.full((current_batch_size,), 1, dtype=torch.float32, device=device)
+        loss_right = criterion(score_right.view(-1), label) * (1 + alpha)
+        loss_right.backward()
+
+        label.fill_(0)
+        loss_fake = criterion(score_fake.view(-1), label)
+        loss_fake.backward()
+
+        label.fill_(0)
+        loss_wrong = criterion(score_wrong.view(-1), label) * alpha
+        loss_wrong.backward()
+
+        # calculate losses and update
+        loss_d = loss_right + loss_fake + loss_wrong
+        optimizer_d.step()
+    elif algorithm == 'wgan':
+        # calculate losses and update
+        loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right).mean()
+        loss_d.backward()
+        optimizer_d.step()
+
+        # clipping
+        for p in net_d.parameters():
+            p.data.clamp_(-c, c)
+    else:
+        # 'wgan-gp' and 'wgan-lp'
+        # random sample
+        epsilon = np.random.rand(current_batch_size)
+        heatmap_sample = torch.empty_like(heatmap_real)
+        for j in range(current_batch_size):
+            heatmap_sample[j] = epsilon[j] * heatmap_real[j] + (1 - epsilon[j]) * heatmap_fake[j]
+        heatmap_sample.requires_grad = True
+        text_match.requires_grad = True
+
+        # calculate gradient penalty
+        score_sample = net_d(heatmap_sample, text_match)
+        gradient_h, gradient_t = grad(score_sample, [heatmap_sample, text_match], torch.ones_like(score_sample),
+                                        create_graph=True)
+        gradient_norm = (gradient_h.pow(2).sum((1, 2, 3)) + gradient_t.pow(2).sum((1, 2, 3))).sqrt()
+
+        # calculate losses and update
+        if algorithm == 'wgan-gp':
+            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
+                (gradient_norm - 1).pow(2))).mean()
+        else:
+            # 'wgan-lp'
+            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
+                torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()
+
+        loss_d.backward()
+        optimizer_d.step()
+        return loss_d
+
+def update_generator():
+    net_g.train()
+    loss_g = torch.tensor(0)
+    net_g.zero_grad()
+
+    # get sentence vectors and noises
+    text_interpolated = dataset.get_interpolated_caption_tensor(current_batch_size)
+    noise = get_noise_tensor(current_batch_size)
+    noise2 = get_noise_tensor(current_batch_size)
+    text_interpolated = text_interpolated.to(device)
+    noise = noise.to(device)
+    noise2 = noise2.to(device)
+
+    # generate heatmaps
+    heatmap_fake = net_g(noise, text_match)
+    heatmap_interpolated = net_g(noise2, text_interpolated)
+
+    # discriminate heatmpap-text pairs
+    score_fake = net_d(heatmap_fake, text_match)
+    score_interpolated = net_d(heatmap_interpolated, text_interpolated)
+
+    if algorithm == 'gan':
+        label = torch.full((current_batch_size,), 1, dtype=torch.float32, device=device)
+        loss_g = criterion(score_fake.view(-1), label) + criterion(score_interpolated.view(-1), label)
+
+        # calculate losses and update
+        loss_g.backward()
+        optimizer_g.step()
+    else:
+        # 'wgan', 'wgan-gp' and 'wgan-lp'
+        # calculate losses and update
+        loss_g = -(score_fake + score_interpolated).mean()
+        loss_g.backward()
+        optimizer_g.step()
+    return loss_g
+
 def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train):
     print('learning rate: g ' + str(optimizer_g.param_groups[0].get('lr')) + ' d ' + str(
             optimizer_d.param_groups[0].get('lr')))
-    iteration = 1
-    loss_g = torch.tensor(0)
-    loss_d = torch.tensor(0)
-    for i, batch in enumerate(dataLoader_train, 0):
-        net_g.train()
-        net_d.train()
-        ############################
+    iteration = 1    
+    
+    for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-        ###########################
-        net_d.zero_grad()
-
-        # get heatmaps, sentence vectors and noises
-        heatmap_real = batch.get('heatmap').to(device)
-        text_match = batch.get('vector').to(device)
-        current_batch_size = len(heatmap_real)
-        """搞不好隨便取取到對的?"""
-        text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
-        noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)
-
-        """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
-        fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
-        # discriminate heatmpap-text pairs
-        score_right = net_d(heatmap_real, text_match)
-        score_wrong = net_d(heatmap_real, text_mismatch)
-
-        # generate heatmaps
-        heatmap_fake = net_g(noise, text_match).detach()
-
-        # discriminate heatmpap-text pairs
-        score_fake = net_d(heatmap_fake, text_match)
-
-        if algorithm == 'gan':
-            label = torch.full((current_batch_size,), 1, dtype=torch.float32, device=device)
-            loss_right = criterion(score_right.view(-1), label) * (1 + alpha)
-            loss_right.backward()
-
-            label.fill_(0)
-            loss_fake = criterion(score_fake.view(-1), label)
-            loss_fake.backward()
-
-            label.fill_(0)
-            loss_wrong = criterion(score_wrong.view(-1), label) * alpha
-            loss_wrong.backward()
-
-            # calculate losses and update
-            loss_d = loss_right + loss_fake + loss_wrong
-            optimizer_d.step()
-        elif algorithm == 'wgan':
-            # calculate losses and update
-            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right).mean()
-            loss_d.backward()
-            optimizer_d.step()
-
-            # clipping
-            for p in net_d.parameters():
-                p.data.clamp_(-c, c)
-        else:
-            # 'wgan-gp' and 'wgan-lp'
-            # random sample
-            epsilon = np.random.rand(current_batch_size)
-            heatmap_sample = torch.empty_like(heatmap_real)
-            for j in range(current_batch_size):
-                heatmap_sample[j] = epsilon[j] * heatmap_real[j] + (1 - epsilon[j]) * heatmap_fake[j]
-            heatmap_sample.requires_grad = True
-            text_match.requires_grad = True
-
-            # calculate gradient penalty
-            score_sample = net_d(heatmap_sample, text_match)
-            gradient_h, gradient_t = grad(score_sample, [heatmap_sample, text_match], torch.ones_like(score_sample),
-                                        create_graph=True)
-            gradient_norm = (gradient_h.pow(2).sum((1, 2, 3)) + gradient_t.pow(2).sum((1, 2, 3))).sqrt()
-
-            # calculate losses and update
-            if algorithm == 'wgan-gp':
-                loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
-                    (gradient_norm - 1).pow(2))).mean()
-            else:
-                # 'wgan-lp'
-                loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
-                    torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()
-
-            loss_d.backward()
-            optimizer_d.step()
-
+        loss_d = update_discriminator()
         # log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)
 
-        ############################
-        # (2) Update G network: maximize log(D(G(z)))
-        ###########################
+        # after training discriminator for N times, train gernerator for 1 time
         if iteration == cfg.N_train_D_1_train_G:
-            net_g.zero_grad()
-            iteration = 0
-
-            # get sentence vectors and noises
-            text_interpolated = dataset.get_interpolated_caption_tensor(current_batch_size)
-            noise = get_noise_tensor(current_batch_size)
-            noise2 = get_noise_tensor(current_batch_size)
-            text_interpolated = text_interpolated.to(device)
-            noise = noise.to(device)
-            noise2 = noise2.to(device)
-
-            # generate heatmaps
-            heatmap_fake = net_g(noise, text_match)
-            heatmap_interpolated = net_g(noise2, text_interpolated)
-
-            # discriminate heatmpap-text pairs
-            score_fake = net_d(heatmap_fake, text_match)
-            score_interpolated = net_d(heatmap_interpolated, text_interpolated)
-
-            if algorithm == 'gan':
-                label = torch.full((current_batch_size,), 1, dtype=torch.float32, device=device)
-                loss_g = criterion(score_fake.view(-1), label) + criterion(score_interpolated.view(-1), label)
-
-                # calculate losses and update
-                loss_g.backward()
-                optimizer_g.step()
-            else:
-                # 'wgan', 'wgan-gp' and 'wgan-lp'
-                # calculate losses and update
-                loss_g = -(score_fake + score_interpolated).mean()
-                loss_g.backward()
-                optimizer_g.step()
-
+            # (2) Update G network: maximize log(D(G(z)))
+            loss_g = update_generator()
             # log
             writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)
 
@@ -174,6 +177,8 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
             batch_number) + ' g loss: ' + str(loss_g.item()) + ' d loss: ' + str(loss_d.item()))
 
         iteration = iteration + 1
+
+        return loss_g, loss_d
 
 def eval_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
     # validate
@@ -245,38 +250,33 @@ def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d):
                 loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
 
 def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val):   
+    # tensorboard
     if cfg.USE_TENSORBOARD:
         print("[Info] Use Tensorboard")    
         from torch.utils.tensorboard import SummaryWriter 
-        tb_writer = SummaryWriter(log_dir=os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))
-    
-    
+        tb_writer = SummaryWriter(log_dir=os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))    
+    # create log files
     log_train_file = os.path.join(cfg.OUTPUT_DIR, 'train.log')
     log_valid_file = os.path.join(cfg.OUTPUT_DIR, 'valid.log')
-    print('[Info] Training performance will be written to file: {} and {}'.format(
-        log_train_file, log_valid_file))
-
+    print('[Info] Training performance will be written to file: {} and {}'.format(log_train_file, log_valid_file))
     with open(log_train_file, 'w') as log_tf, open(log_valid_file, 'w') as log_vf:
         log_tf.write('epoch,loss_g,loss_d\n')
         log_vf.write('epoch,loss_g,loss_d\n')    
 
-    # number of batches
-    batch_number = len(dataLoader_train)
-
-    for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):
-        
+    for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):        
+        # Train!!
         start = time.time()
-        train_loss_g, train_loss_d = train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d)
+        train_loss_g, train_loss_d = train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train)
         lr_g=optimizer_g.param_groups[0].get('lr')
         lr_d=optimizer_d.param_groups[0].get('lr')
         print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d)
 
-        #saveModel_plotGenerative(net_g, net_d, fixedData, f'{e + 1:05d}', skeleton)        
+        # Evaluate!!
         start = time.time()
         val_loss_g, val_loss_d = eval_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d)
 
-
+        # Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:
             log_tf.write('{epoch},{loss_g: 8.5f},{loss_d: 8.5f}\n'.format(
                 epoch=e, loss_g=train_loss_g, loss_d=train_loss_d))
@@ -291,3 +291,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         
 
     print('\nfinished')
+
+
+if __name__ == "__main__":
+    data_loader = list(range(1000))
+    desc = '  - (Training)   '
+    for i, j in enumerate(tqdm(data_loader, desc=desc)):
+        sleep(0.01)

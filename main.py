@@ -2,13 +2,11 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-import torch.optim as optim
-
-
 from config import cfg
 from train_conditional import train
 from data import FixedData, getData
 from model import getModels
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
@@ -24,7 +22,7 @@ if __name__ == "__main__":
     text_match_val = data_val.get('vector').to(device)
     label_val = torch.full((len(dataset_val),), 1, dtype=torch.float32, device=device)"""
 
-    optimizer_g = optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2))
-    optimizer_d = optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2))
+    optimizer_g = torch.optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2))
+    optimizer_d = torch.optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2))
     criterion = nn.BCELoss()
     train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val)
