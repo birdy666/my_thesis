@@ -5,17 +5,13 @@ import torch
 import json
 import os
 import random
+from tqdm import tqdm
 
-import cv2
-
-from skimage import io
-from matplotlib import pyplot as plt
 import string
 
 
 from geometry import rotation2so3
 from utils import get_noise_tensor, get_caption_vector
-from models.smpl import SMPL
 from config import cfg
 
 
@@ -63,12 +59,8 @@ def getData(cfg):
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
     # load text encoding model
-    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
-    
-    eft_all_with_caption = getEFTCaption(cfg, coco_caption)
-    """
-    取得dataset
-    """
+    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)    
+    eft_all_with_caption = getEFTCaption(cfg, coco_caption)    
     print("create dataloaders")
     # get the dataset (single person, with captions)
     train_size = int(len(eft_all_with_caption)*0.9)
@@ -105,7 +97,7 @@ class TheDataset(torch.utils.data.Dataset):
                     'smpltype': eft_all_with_caption[i]['smpltype'],
                     'annotId': eft_all_with_caption[i]['annotId'],
                     'imageName': eft_all_with_caption[i]['imageName']}
-            data['so3'] = [rotation2so3(R) for R in data['parm_pose']]
+            data['so3'] = np.array([rotation2so3(R) for R in data['parm_pose']])
             # add sentence encoding
             if text_model is not None:
                 # 加這一行資料量從19116 變 19083 但可以刷掉一些感覺就跟人沒有關的怪異資料
@@ -121,11 +113,14 @@ class TheDataset(torch.utils.data.Dataset):
         data = self.dataset[index]
         item = dict()        
         # change heatmap range from [0,1] to[-1,1]
-        item['parm_pose'] = torch.tensor(data['parm_pose'], dtype=torch.float32)
+        item['so3'] = torch.tensor(data['so3'], dtype=torch.float32)
 
         item['vector'] = torch.tensor(data['vector'], dtype=torch.float32)
         """unsqueeze_ is in place operation, unsqueeze isn't"""
-        item['vector'].unsqueeze_(-1).unsqueeze_(-1)
+        #item['vector'].unsqueeze_(-1).unsqueeze_(-1)
+        others = range(0, index) + range(index+1, len(self.dataset))
+        data_random = self.dataset[random.choice(others)]
+        item['vector_mismatch'] = torch.tensor(data_random['vector'], dtype=torch.float32)
             
         return item
 
@@ -172,8 +167,18 @@ class TheDataset(torch.utils.data.Dataset):
             return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
 """
 if __name__ == "__main__":
-    x = np.array([1,1,1])
-    def a(Li):
-        Li = Li.copy()*2
-    a(x)
-    print(x)
+    coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
+    #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
+    # load text encoding model
+    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)    
+    eft_all_with_caption = getEFTCaption(cfg, coco_caption)    
+    print("create dataloaders")
+    # get the dataset (single person, with captions)
+    train_size = int(len(eft_all_with_caption)*0.9)
+    dataset_train = TheDataset(cfg, eft_all_with_caption[:train_size], coco_caption, text_model=text_model)
+    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
+    desc = '  - (Training)   '
+    for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):
+        print(batch.get('so3').shape)
+        print(len(batch.get('so3')))        
+        break

@@ -39,33 +39,31 @@ def saveModel_plotGenerative(net_g, net_d, fixedData, suffix, skeleton):
         fixed_fake = net_g(fixedData.noise.repeat_interleave(fixedData.w, dim=0), fixedData.text.repeat(fixedData.h, 1, 1, 1))
     plot_generative_samples_from_noise(fixed_fake, fixedData.real_array, fixedData.caption, fixedData.w, fixedData.h, multi, skeleton, start_from_epoch)
 
-def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion):
+def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch):
     net_d.train()
     loss_d = torch.tensor(0)
     net_d.zero_grad()
 
     # get heatmaps, sentence vectors and noises
-    heatmap_real = batch.get('heatmap').to(device)
-    text_match = batch.get('vector').to(device)
-    current_batch_size = len(heatmap_real)
-    """搞不好隨便取取到對的?"""
-    text_mismatch = dataset.get_random_caption_tensor(current_batch_size).to(device)
-    noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)
+    so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
+    vector_match = batch.get('vector').to(device) # torch.Size([128, 24, 300, 1, 1])
+    vector_mismatch = batch.get('vector_mismatch').to(device)
+    """noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)"""
 
     """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
     fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
     # discriminate heatmpap-text pairs
-    score_right = net_d(heatmap_real, text_match)
-    score_wrong = net_d(heatmap_real, text_mismatch)
+    score_right = net_d(so3_real, vector_match)
+    score_wrong = net_d(so3_real, vector_mismatch)
 
-    # generate heatmaps
-    heatmap_fake = net_g(noise, text_match).detach()
-    # discriminate heatmpap-text pairs
-    score_fake = net_d(heatmap_fake, text_match)
+    # generate so3
+    so3_fake = net_g(vector_match).detach()
+    # discriminate so3-text pairs
+    score_fake = net_d(so3_fake, vector_match)
 
     if algorithm == 'gan':
         # torch.full(size, fill_value, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
-        label = torch.full((current_batch_size,), 1, dtype=torch.float32, device=device)
+        label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
         loss_right = criterion(score_right.view(-1), label) * (1 + alpha)
         loss_right.backward()
 
@@ -85,16 +83,15 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion):
         loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right).mean()
         loss_d.backward()
         optimizer_d.step()
-
         # clipping
         for p in net_d.parameters():
             p.data.clamp_(-c, c)
     else:
-        # 'wgan-gp' and 'wgan-lp'
+        """# 'wgan-gp' and 'wgan-lp'
         # random sample
-        epsilon = np.random.rand(current_batch_size)
+        epsilon = np.random.rand(cfg.BATCH_SIZE)
         heatmap_sample = torch.empty_like(heatmap_real)
-        for j in range(current_batch_size):
+        for j in range(cfg.BATCH_SIZE):
             heatmap_sample[j] = epsilon[j] * heatmap_real[j] + (1 - epsilon[j]) * heatmap_fake[j]
         heatmap_sample.requires_grad = True
         text_match.requires_grad = True
@@ -115,8 +112,9 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion):
                 torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()
 
         loss_d.backward()
-        optimizer_d.step()
-        return loss_d
+        optimizer_d.step()"""
+        print("先不測試ㄌ")
+    return loss_d
 
 def update_generator():
     net_g.train()
@@ -158,10 +156,10 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     print('learning rate: g ' + str(optimizer_g.param_groups[0].get('lr')) + ' d ' + str(
             optimizer_d.param_groups[0].get('lr')))
     iteration = 1    
-    
+    desc = '  - (Training)   '
     for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-        loss_d = update_discriminator()
+        loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
         # log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)
 
@@ -294,7 +292,8 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    data_loader = list(range(1000))
-    desc = '  - (Training)   '
-    for i, j in enumerate(tqdm(data_loader, desc=desc)):
-        sleep(0.01)
+    index = 4
+    others = list(range(0, index)) + list(range(index+1, 5))
+    print(others)
+    import random
+    print(random.choice(others))

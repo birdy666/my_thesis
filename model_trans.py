@@ -4,7 +4,7 @@ import torch.nn as nn
 from transformer import PositionalEncoding, EncoderLayer
 
 def getModel(cfg):
-    return Generator(cfg)
+    return Generator(cfg), Discriminator(cfg)
 
 class Generator(nn.Module):
     def __init__(self, cfg):

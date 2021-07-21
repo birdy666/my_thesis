@@ -4,7 +4,7 @@ import numpy as np
 
 from config import cfg
 from train_conditional import train
-from data import FixedData, getData
+from data import getData
 from model import getModels
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -14,7 +14,6 @@ if __name__ == "__main__":
     net_g, net_d = getModels(cfg, device, algorithm='wgan')
     #fixedData = FixedData(dataset_val, text_model, device)    
 
-    # data loader, containing heatmap information
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
     dataLoader_val = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=False)
     """# data to validate
