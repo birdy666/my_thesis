@@ -44,7 +44,7 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
     loss_d = torch.tensor(0)
     net_d.zero_grad()
 
-    # get heatmaps, sentence vectors and noises
+    # get so3, sentence vectors and noises
     so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
@@ -88,6 +88,7 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
         for p in net_d.parameters():
             p.data.clamp_(-c, c)
     else:
+        print("先不測試ㄌ")
         """# 'wgan-gp' and 'wgan-lp'
         # random sample
         epsilon = np.random.rand(cfg.BATCH_SIZE)
@@ -114,7 +115,7 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
 
         loss_d.backward()
         optimizer_d.step()"""
-        print("先不測試ㄌ")
+        
     return loss_d
 
 def update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch):
@@ -157,10 +158,12 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     print('learning rate: g ' + str(optimizer_g.param_groups[0].get('lr')) + ' d ' + str(
             optimizer_d.param_groups[0].get('lr')))
     iteration = 1    
-    
+    total_loss_g = 0
+    total_loss_d = 0
     for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ')):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
+        total_loss_d += loss_d
         # log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)
 
@@ -168,6 +171,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         if iteration == cfg.N_train_D_1_train_G:
             # (2) Update G network: maximize log(D(G(z)))
             loss_g = update_generator()
+            total_loss_g += loss_g
             # log
             writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)
 
@@ -177,33 +181,35 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
 
         iteration = iteration + 1
 
-        return loss_g, loss_d
+    return total_loss_g, total_loss_d
 
-def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
-    # validate
-    net_g.eval()
-    net_d.eval()
-
+def get_d_loss(cfg, device, net_g, net_d, criterion, batch):
+    # get so3, sentence vectors and noises
+    so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
+    text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
+    text_match_mask = batch.get('vec_mask').to(device)
+    text_mismatch = batch.get('vec_mismatch').to(device)
     # calculate d loss
-    noise_val = get_noise_tensor(dataset_val.__len__()).to(device)
-    text_mismatch_val = dataset_val.get_random_caption_tensor(dataset_val.__len__()).to(device)
+    noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     with torch.no_grad():
-        score_right_val = net_d(heatmap_real_val, text_match_val).detach()
-        score_wrong_val = net_d(heatmap_real_val, text_mismatch_val).detach()
-        heatmap_fake_val = net_g(noise_val, text_match_val).detach()
-        score_fake_val = net_d(heatmap_fake_val, text_match_val).detach()
+        score_right = net_d(so3_real, text_match).detach()
+        score_wrong = net_d(so3_real, text_mismatch).detach()
+        so3_fake = net_g(noise, text_match, text_match_mask).detach()
+        score_fake = net_d(so3_fake, text_match).detach()
+
     if algorithm == 'gan':
-        label_val.fill_(1)
-        loss_right_val = criterion(score_right_val.view(-1), label_val) * (1 + alpha)
-        label_val.fill_(0)
-        loss_fake_val = criterion(score_fake_val.view(-1), label_val)
-        label_val.fill_(0)
-        loss_wrong_val = criterion(score_wrong_val.view(-1), label_val) * alpha
-        loss_d_val = loss_right_val + loss_fake_val + loss_wrong_val
+        label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
+        loss_right = criterion(score_right.view(-1), label) * (1 + alpha)
+        label.fill_(0)
+        loss_fake = criterion(score_fake.view(-1), label)
+        label.fill_(0)
+        loss_wrong = criterion(score_wrong.view(-1), label) * alpha
+        loss_d = loss_right + loss_fake + loss_wrong
     elif algorithm == 'wgan':
-        loss_d_val = (score_fake_val + alpha * score_wrong_val - (1 + alpha) * score_right_val).mean()
+        loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right).mean()
     else:
-        # 'wgan-gp' and 'wgan-lp'
+        print("先不測試ㄌ")
+        """# 'wgan-gp' and 'wgan-lp'
         epsilon_val = np.random.rand(dataset_val.__len__())
         heatmap_sample_val = torch.empty_like(heatmap_real_val)
         for j in range(dataset_val.__len__()):
@@ -220,27 +226,51 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
 
         else:
             # 'wgan-lp'
-            loss_d_val = (score_fake_val + alpha * score_wrong_val - (1 + alpha) * score_right_val + lamb * (
+                oss_d_val = (score_fake_val + alpha * score_wrong_val - (1 + alpha) * score_right_val + lamb * (
                 torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm_val - 1).pow(2))).mean()
+        """
+    return loss_d
 
-    # calculate g loss
-    text_interpolated_val = dataset_val.get_interpolated_caption_tensor(dataset_val.__len__()).to(device)
-    noise_val = get_noise_tensor(dataset_val.__len__()).to(device)
-    noise2_val = get_noise_tensor(dataset_val.__len__()).to(device)
+def get_g_loss(cfg, device, net_g, net_d, criterion, batch):    
+    text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
+    text_match_mask = batch.get('vec_mask').to(device)
+    text_interpolated = batch.get('vec_interpolated').to(device)
+    text_interpolated_mask = batch.get('vec_interpolated_mask').to(device)
+    noise1 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
+    noise2 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
+        
     with torch.no_grad():
-        heatmap_fake_val = net_g(noise_val, text_match_val).detach()
-        heatmap_interpolated_val = net_g(noise2_val, text_interpolated_val).detach()
-        score_fake_val = net_d(heatmap_fake_val, text_match_val).detach()
-        score_interpolated_val = net_d(heatmap_interpolated_val, text_interpolated_val).detach()
+        # generate so3
+        so3_fake = net_g(noise1, text_match, text_match_mask)
+        so3__interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
+            
+        score_fake = net_d(so3_fake, text_match).detach()
+        score_interpolated = net_d(so3__interpolated, text_interpolated).detach()
     if algorithm == 'gan':
-        label_val.fill_(1)
-        loss_g_val = criterion(score_fake_val.view(-1), label_val) + criterion(score_interpolated_val.view(-1),
-                                                                               label_val)
+        label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
+        loss_g = criterion(score_fake.view(-1), label) + criterion(score_interpolated.view(-1), label)
     else:
         # 'wgan', 'wgan-gp' and 'wgan-lp'
-        loss_g_val = -(score_fake_val + score_interpolated_val).mean()
-    
-    return loss_g_val, loss_d_val   
+        loss_g = -(score_fake + score_interpolated).mean()
+    return loss_g
+
+def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
+    # validate
+    net_g.eval()
+    net_d.eval()
+
+    total_loss_g = 0
+    total_loss_d = 0
+    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   ')):
+        # calculate d loss
+        loss_d = get_d_loss(cfg, device, net_g, net_d, criterion, batch)
+        total_loss_d += loss_d
+
+        # calculate g loss
+        loss_g = get_g_loss(cfg, device, net_g, net_d, criterion, batch)
+        total_loss_g += loss_g
+
+    return total_loss_g, total_loss_d   
 
 def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d):
     print('  - {header:12} loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
