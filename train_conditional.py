@@ -46,20 +46,21 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
 
     # get heatmaps, sentence vectors and noises
     so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
-    vector_match = batch.get('vector').to(device) # torch.Size([128, 24, 300, 1, 1])
-    vector_mismatch = batch.get('vector_mismatch').to(device)
-    """noise = get_noise_tensor(current_batch_size, cfg.NOISE_SIZE).to(device)"""
+    text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
+    text_match_mask = batch.get('vec_mask').to(device)
+    text_mismatch = batch.get('vec_mismatch').to(device)
+    noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
 
     """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
     fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
     # discriminate heatmpap-text pairs
-    score_right = net_d(so3_real, vector_match)
-    score_wrong = net_d(so3_real, vector_mismatch)
+    score_right = net_d(so3_real, text_match)
+    score_wrong = net_d(so3_real, text_mismatch)
 
-    # generate so3
-    so3_fake = net_g(vector_match).detach()
+    # generate so3, 這裡要detach是因為我們是更新net_d不是net_g
+    so3_fake = net_g(noise, text_match, text_match_mask)
     # discriminate so3-text pairs
-    score_fake = net_d(so3_fake, vector_match)
+    score_fake = net_d(so3_fake.detach(), text_match)
 
     if algorithm == 'gan':
         # torch.full(size, fill_value, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
@@ -116,29 +117,29 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
         print("先不測試ㄌ")
     return loss_d
 
-def update_generator():
+def update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch):
     net_g.train()
     loss_g = torch.tensor(0)
     net_g.zero_grad()
 
     # get sentence vectors and noises
-    text_interpolated = dataset.get_interpolated_caption_tensor(current_batch_size)
-    noise = get_noise_tensor(current_batch_size)
-    noise2 = get_noise_tensor(current_batch_size)
-    text_interpolated = text_interpolated.to(device)
-    noise = noise.to(device)
-    noise2 = noise2.to(device)
+    text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
+    text_match_mask = batch.get('vec_mask').to(device)
+    text_interpolated = batch.get('vec_interpolated').to(device)
+    text_interpolated_mask = batch.get('vec_interpolated_mask').to(device)
+    noise1 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
+    noise2 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
 
-    # generate heatmaps
-    heatmap_fake = net_g(noise, text_match)
-    heatmap_interpolated = net_g(noise2, text_interpolated)
+    # generate so3
+    so3_fake = net_g(noise1, text_match, text_match_mask)
+    so3__interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
 
     # discriminate heatmpap-text pairs
-    score_fake = net_d(heatmap_fake, text_match)
-    score_interpolated = net_d(heatmap_interpolated, text_interpolated)
+    score_fake = net_d(so3_fake, text_match)
+    score_interpolated = net_d(so3__interpolated, text_interpolated)
 
     if algorithm == 'gan':
-        label = torch.full((current_batch_size,), 1, dtype=torch.float32, device=device)
+        label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
         loss_g = criterion(score_fake.view(-1), label) + criterion(score_interpolated.view(-1), label)
 
         # calculate losses and update
@@ -156,8 +157,8 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     print('learning rate: g ' + str(optimizer_g.param_groups[0].get('lr')) + ' d ' + str(
             optimizer_d.param_groups[0].get('lr')))
     iteration = 1    
-    desc = '  - (Training)   '
-    for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):        
+    
+    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ')):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
         # log
@@ -178,7 +179,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
 
         return loss_g, loss_d
 
-def eval_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
+def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
     # validate
     net_g.eval()
     net_d.eval()
@@ -271,7 +272,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
         # Evaluate!!
         start = time.time()
-        val_loss_g, val_loss_d = eval_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
+        val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d)
 
         # Write log

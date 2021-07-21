@@ -1,4 +1,5 @@
 import fasttext
+import fasttext.util
 import numpy as np
 from pycocotools.coco import COCO
 import torch
@@ -71,21 +72,6 @@ def getData(cfg):
     return text_model, eft_all_with_caption, dataset_train, dataset_val
 
 
-
-class FixedData():
-    def __init__(self, dataset_val, text_model, device):
-        # fixed training data (from validation set), noise and sentence vectors to see the progression
-        self.h = 6
-        self.w = 5
-        self.train = dataset_val.get_random_heatmap_with_caption(self.w)
-        fixed_real = self.train.get('heatmap').to(device)
-        self.real_array = np.array(fixed_real.tolist()) * 0.5 + 0.5
-        self.caption = self.train.get('caption')
-        """6個128x1x1 ==> 4維陣列， 他是下面想要畫出6個假的pose"""
-        self.noise = get_noise_tensor(self.h).to(device)
-        self.text = torch.tensor([get_caption_vector(text_model, caption) for caption in self.caption], dtype=torch.float32,
-                            device=device).unsqueeze(-1).unsqueeze(-1)
-
 class TheDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, eft_all_with_caption, coco_caption, text_model=None, val=False):
         self.dataset = []
@@ -103,7 +89,7 @@ class TheDataset(torch.utils.data.Dataset):
                 # 加這一行資料量從19116 變 19083 但可以刷掉一些感覺就跟人沒有關的怪異資料
                 caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
                 if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
-                    data['vector'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN)
+                    data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN, cfg.D_WORD_VEC)
                     self.dataset.append(data)      
     
     def __len__(self):
@@ -114,59 +100,41 @@ class TheDataset(torch.utils.data.Dataset):
         item = dict()        
         # change heatmap range from [0,1] to[-1,1]
         item['so3'] = torch.tensor(data['so3'], dtype=torch.float32)
-
+        #item['vector'].unsqueeze_(-1).unsqueeze_(-1) 完全不知道我這裡要不要
         item['vector'] = torch.tensor(data['vector'], dtype=torch.float32)
+        item['vec_mask'] = torch.tensor(data['vec_mask'], dtype=torch.int)
         """unsqueeze_ is in place operation, unsqueeze isn't"""
-        #item['vector'].unsqueeze_(-1).unsqueeze_(-1)
-        others = range(0, index) + range(index+1, len(self.dataset))
-        data_random = self.dataset[random.choice(others)]
-        item['vector_mismatch'] = torch.tensor(data_random['vector'], dtype=torch.float32)
+        item['vec_mismatch'] = self.get_text_mismatch(index)
+        item['vec_interpolated'], item['vec_interpolated_mask'] = self.get_interpolated_text(0.5)
             
         return item
 
     # get a batch of random caption sentence vectors from the whole dataset
-    def get_random_caption_tensor(self, number):
-        vector_tensor = torch.empty((number, self.cfg.SENTENCE_VECTOR_SIZE), dtype=torch.float32)
-
-        for i in range(number):
-            # randomly select from all captions
-            vector = random.choice(random.choice(self.dataset).get('vector'))
-            vector_tensor[i] = torch.tensor(vector, dtype=torch.float32)
-            
-        return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
-            
-
-"""    # get a batch of random heatmaps and captions from the whole dataset
-    def get_random_heatmap_with_caption(self, number):
-        caption = []
-        heatmap = torch.empty((number, total_keypoints, heatmap_size, heatmap_size), dtype=torch.float32)
-
-        for i in range(number):
-            # randomly select from all images
-            data = random.choice(self.dataset)
-            heatmap[i] = torch.tensor(self.get_heatmap(data, augment=False) * 2 - 1, dtype=torch.float32)
-            caption.append(random.choice(data.get('caption')).get('caption'))
-
-        return {'heatmap': heatmap, 'caption': caption}
-
+    def get_text_mismatch(self, index):
+        others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
+        data_random = self.dataset[random.choice(others)]
+        return torch.tensor(data_random['vector'], dtype=torch.float32)
+    
     # get a batch of random interpolated caption sentence vectors from the whole dataset
-    def get_interpolated_caption_tensor(self, batch_size):
-        vector_tensor = torch.empty((batch_size, sentence_vector_size), dtype=torch.float32)
+    # 預設mask我是用or但不確定合不合理?
+    def get_interpolated_text(self, beta, f_mask = lambda x,y: [1 if x[i] or y[i] else 0 for i in range(len(x))]):
+        index1 = random.choice(list(len(self.dataset)))
+        index2 = random.choice(list(len(self.dataset)))
+        vector1 = self.dataset[index1]['vector']
+        vector2 = self.dataset[index2]['vector']
+        mask = f_mask(self.dataset[index1]['vec_mask'], self.dataset[index2]['vec_mask'])
+        # interpolate caption sentence vectors
+        return beta * vector1 + (1 - beta) * vector2, mask
 
-        for i in range(batch_size):
-            # randomly select 2 captions from all captions
-            vector = random.choice(random.choice(self.dataset).get('vector'))
-            vector2 = random.choice(random.choice(self.dataset).get('vector'))
 
-            # interpolate caption sentence vectors
-            interpolated_vector = beta * vector + (1 - beta) * vector2
-            vector_tensor[i] = torch.tensor(interpolated_vector, dtype=torch.float32)
-        if self.for_regression:
-            return vector_tensor
-        else:
-            return vector_tensor.unsqueeze_(-1).unsqueeze_(-1)
-"""
 if __name__ == "__main__":
+    print("This is data.py")
+    """
+    如果有朝一日想要換vector的為度
+    ft = fasttext.load_model(cfg.TEXT_MODEL_PATH)
+    print(ft.get_dimension())
+    fasttext.util.reduce_model(ft, 100)
+    print(ft.get_dimension())"""
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
     # load text encoding model
@@ -178,7 +146,15 @@ if __name__ == "__main__":
     dataset_train = TheDataset(cfg, eft_all_with_caption[:train_size], coco_caption, text_model=text_model)
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
     desc = '  - (Training)   '
+    # torch.cat((noise_vector, sentence_vector), 1)
+    # noise_tensor = torch.randn((number, noise_size, 1, 1), dtype=torch.float32)
     for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):
-        print(batch.get('so3').shape)
-        print(len(batch.get('so3')))        
+        noise_tensor = torch.randn((128, 24, 300), dtype=torch.float32)
+        a = torch.cat((batch.get('vector'), noise_tensor), 2)
+        print(a.shape)
+        print(batch.keys())
+        print(batch.get('vector').shape)
+        print(batch.get('vec_mask').shape)
+        print(batch.get('vec_mask')[0])
+        
         break
