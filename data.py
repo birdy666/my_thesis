@@ -118,8 +118,8 @@ class TheDataset(torch.utils.data.Dataset):
     # get a batch of random interpolated caption sentence vectors from the whole dataset
     # 預設mask我是用or但不確定合不合理?
     def get_interpolated_text(self, beta, f_mask = lambda x,y: [1 if x[i] or y[i] else 0 for i in range(len(x))]):
-        index1 = random.choice(list(len(self.dataset)))
-        index2 = random.choice(list(len(self.dataset)))
+        index1 = random.randint(0, len(self.dataset)-1)  # randint(a, b) （a <= N <= b）
+        index2 = random.randint(0, len(self.dataset)-1)
         vector1 = self.dataset[index1]['vector']
         vector2 = self.dataset[index2]['vector']
         mask = f_mask(self.dataset[index1]['vec_mask'], self.dataset[index2]['vec_mask'])
@@ -149,12 +149,8 @@ if __name__ == "__main__":
     # torch.cat((noise_vector, sentence_vector), 1)
     # noise_tensor = torch.randn((number, noise_size, 1, 1), dtype=torch.float32)
     for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):
-        noise_tensor = torch.randn((128, 24, 300), dtype=torch.float32)
-        a = torch.cat((batch.get('vector'), noise_tensor), 2)
-        print(a.shape)
-        print(batch.keys())
         print(batch.get('vector').shape)
         print(batch.get('vec_mask').shape)
-        print(batch.get('vec_mask')[0])
+        print(batch.get('vec_mask').unsqueeze(-2).unsqueeze(1).shape)
         
         break

@@ -1,3 +1,4 @@
+import random
 import time
 from torch.autograd import grad
 import torch
@@ -160,24 +161,20 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     iteration = 1    
     total_loss_g = 0
     total_loss_d = 0
-    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ')):        
+    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   '), leave=False):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
         total_loss_d += loss_d
-        # log
-        writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)
+        """# log
+        writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
 
         # after training discriminator for N times, train gernerator for 1 time
         if iteration == cfg.N_train_D_1_train_G:
             # (2) Update G network: maximize log(D(G(z)))
             loss_g = update_generator()
             total_loss_g += loss_g
-            # log
-            writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)
-
-        # print progress
-        print('epoch ' + str(e + 1) + ' of ' + str(end_in_epoch) + ' batch ' + str(i + 1) + ' of ' + str(
-            batch_number) + ' g loss: ' + str(loss_g.item()) + ' d loss: ' + str(loss_d.item()))
+            """# log
+            writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)"""
 
         iteration = iteration + 1
 
@@ -261,14 +258,14 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
 
     total_loss_g = 0
     total_loss_d = 0
-    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   ')):
+    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   '), leave=False):
         # calculate d loss
         loss_d = get_d_loss(cfg, device, net_g, net_d, criterion, batch)
-        total_loss_d += loss_d
+        total_loss_d += loss_d.item()
 
         # calculate g loss
         loss_g = get_g_loss(cfg, device, net_g, net_d, criterion, batch)
-        total_loss_g += loss_g
+        total_loss_g += loss_g.item()
 
     return total_loss_g, total_loss_d   
 
@@ -277,6 +274,20 @@ def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d):
             'elapse: {elapse:3.3f} min'.format(
                 header=f"({header})", loss_g=loss_g,
                 loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
+
+def save_models(e, net_g, path_g, net_d, path_d,  save_mode='all'):
+    checkpoint_g = {'epoch': e, 'model': net_g.state_dict()}
+    checkpoint_d = {'epoch': e, 'model': net_g.state_dict()}
+
+    if save_mode == 'all':
+        torch.save(checkpoint_g, path_g + "epoch" + str(e) + ".chkpt")
+        torch.save(checkpoint_d, path_d + "epoch" + str(e) + ".chkpt")
+    elif save_mode == 'best':
+        pass
+        """model_name = 'model.chkpt'
+        if valid_loss <= min(valid_losses):
+            torch.save(checkpoint, os.path.join(opt.output_dir, model_name))
+            print('    - [Info] The checkpoint file has been updated.')"""
 
 def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val):   
     # tensorboard
@@ -299,11 +310,17 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         lr_g=optimizer_g.param_groups[0].get('lr')
         lr_d=optimizer_d.param_groups[0].get('lr')
         print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d)
+        # print progress
+        print(' epoch ' + str(e) + ' train_loss_g: ' + str(train_loss_g) + ' train_loss_d ' + str(train_loss_d))
 
         # Evaluate!!
         start = time.time()
         val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d)
+        # print progress
+        print(' epoch ' + str(e) + ' val_loss_g: ' + str(val_loss_g) + ' val_loss_d ' + str(val_loss_d))
+
+        
 
         # Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:
@@ -313,18 +330,19 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
                 epoch=e, loss_g=val_loss_g, loss_d=val_loss_d))
 
         if cfg.USE_TENSORBOARD:
-            """tb_writer.add_scalars('ppl', {'train': train_ppl, 'val': valid_ppl}, epoch_i)
-            tb_writer.add_scalars('accuracy', {'train': train_accu*100, 'val': valid_accu*100}, epoch_i)
-            tb_writer.add_scalar('learning_rate', lr, epoch_i)"""
-            print("Haven't define what to draw man")
+            tb_writer.add_scalars('loss_g', {'train': train_loss_g, 'val': val_loss_g}, e)
+            tb_writer.add_scalars('loss_d', {'train': train_loss_d, 'val': val_loss_d}, e)
+            tb_writer.add_scalar('learning_rate_g', lr_g, e)
+            tb_writer.add_scalar('learning_rate_d', lr_d, e)
         
 
     print('\nfinished')
 
 
 if __name__ == "__main__":
-    index = 4
-    others = list(range(0, index)) + list(range(index+1, 5))
-    print(others)
-    import random
-    print(random.choice(others))
+    mask = torch.tensor([[1,1,0,0]])
+
+    a = torch.tensor([[1,1,1,0],
+                    [2,2,2,0],
+                    [3,3,3,3]])
+    print(a.masked_fill(mask == 0, -1e9))

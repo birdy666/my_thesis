@@ -31,8 +31,11 @@ class ScaledDotProductAttention(nn.Module):
 
     def forward(self, q, k, v, mask=None):
         # temperature here is used to scale down the matmul of Q,K  to counter exploding gradients.
-        # Q, K 都是四維矩陣，(batch, head, time, 64)，其中head=8,time是句子長度
-        # matmul會把Q、K後兩維進行矩陣乘法
+        # matmul會把Q、K後兩維進行矩陣乘法 timex64 , 64xtime ==> time x time
+        """
+        q, k, v: (batch, head, text_len, d_k)
+        attn: (batch, head, text_len, text_len)
+        """
         attn = torch.matmul(q , k.transpose(-2, -1)) / self.temperature
 
         if mask is not None:
@@ -42,6 +45,10 @@ class ScaledDotProductAttention(nn.Module):
         attn = self.dropout(F.softmax(attn, dim=-1))
         output = torch.matmul(attn, v)
         # 大致流程 (Q, K) ==> matmul ==> scale ==> mask(if any) ==> softmax ==> 和V做matmul
+        """
+        output: (batch, head, text_len , d_k)
+        attn: (batch, head, text_len, text_len)
+        """
         return output, attn
 
 class MultiHeadAttention(nn.Module):
@@ -72,37 +79,56 @@ class MultiHeadAttention(nn.Module):
     """這裡我有點不懂，明明q=k=v= 單字經過embedding後的512維向量(EncoderLayer forward中的enc_input)
     要經過linear後才會變成q,k,v怎麼這裡就叫他們q,k,v? 而且既然一樣幹嘛要傳三個...    
     """
+    """
+    q = k = v
+    """
     def forward(self, q, k, v, mask=None):
 
         d_k, d_v, n_head = self.d_k, self.d_v, self.n_head
-        # sz_b = batch size
-        # q,k,v 的形狀是 (batch, time, 512) 
+        # q,k,v: (batch, text_len, 512) 
         sz_b, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
 
         residual = q
 
         # 經過linear後變成 (batch, time, 512)， 透過view變成 (batch, time, 8, 64)
+        """
+        q, k, v: (batch, text_len, head*d_k) ==> view ==> (batch, text_len, head, d_k)
+        """
         q = self.w_qs(q).view(sz_b, len_q, n_head, d_k)
         k = self.w_ks(k).view(sz_b, len_k, n_head, d_k)
         v = self.w_vs(v).view(sz_b, len_v, n_head, d_v)
 
-        # Transpose 變(batch, 8, time, 64) 這是attention要求的形狀
+        # Transpose 變(batch, head, text_len, d_k) 這是attention要求的形狀
+        """
+        q, k, v: (batch, text_len, head, d_k) ==> transpose(1, 2) ==> (batch, head, text_len, d_k)
+        """ 
         q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
 
         if mask is not None:
+            """
+            mask: (batch, 1, text_len) ==> unsqueeze(1) ==> (batch, 1, 1, text_len)
+            """
             mask = mask.unsqueeze(1)   # For head axis broadcasting.
 
+        """
+        q: (batch, head, text_len , d_k)
+        attn: (batch, head, text_len, text_len)
+        """
         q, attn = self.attention(q, k, v, mask=mask)
 
-        # Transpose to move the head dimension back: b x lq x n x dv
-        # Combine the last two dimensions to concatenate all the heads together: b x lq x (n*dv)
         # 把多頭產生的結果黏在一起 8 個頭 dv = 64 , 8x64=512. 
+        """
+        q: (batch, head, text_len , d_k) ==> (batch, text_len, head*d_k)
+        """
         q = q.transpose(1, 2).contiguous().view(sz_b, len_q, -1)
         q = self.dropout(self.fc(q))
         q += residual
 
         q = self.layer_norm(q)
-
+        """
+        q: (batch, text_len, head*d_k)
+        attn: (batch, head, text_len, text_len)
+        """
         return q, attn
 
 class PositionwiseFeedForward(nn.Module):
@@ -129,7 +155,6 @@ class PositionwiseFeedForward(nn.Module):
 
 class EncoderLayer(nn.Module):
     ''' Compose with two layers '''
-
     def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1):
         super(EncoderLayer, self).__init__()
         self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
@@ -137,8 +162,13 @@ class EncoderLayer(nn.Module):
 
     def forward(self, enc_input, slf_attn_mask=None):
         # 這裡的output是多頭產生的結果，並黏在一起
-        enc_output, enc_slf_attn = self.slf_attn(
-            enc_input, enc_input, enc_input, mask=slf_attn_mask)
+        """
+        enc_input:  (batch, text_len, head*d_k)
+        slf_attn_mask:  (batch, 1, text_len)
+        enc_slf_attn: (batch, head, text_len, text_len)
+        """
+        # enc_input & enc_output have the same shape
+        enc_output, enc_slf_attn = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
         enc_output = self.pos_ffn(enc_output)
         return enc_output, enc_slf_attn
 
