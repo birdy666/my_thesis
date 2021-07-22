@@ -18,7 +18,6 @@ def getModels(cfg):
     return net_g, net_d
 
 # basically Encoder
-"""這裡我直接把d_out用d_k不知道合不合理"""
 class Generator(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -35,12 +34,8 @@ class Generator(nn.Module):
                                                         d_v=cfg.D_V_LIST_G[i], 
                                                         dropout=cfg.DROPOUT_G)
                                                         for i in range(cfg.N_LAYERS_G)])
-        
-        
-    
+         
     def forward(self, noise, input_vec, src_mask, return_attns=False):
-
-        enc_slf_attn_list = []
         # -- Forward
         input_vec_noise = torch.cat((input_vec, noise), -1)
         """這裡應該不用每一層都做， 圖片上的normalize還有dropout在PositionwiseFeedForward"""
@@ -54,9 +49,8 @@ class Generator(nn.Module):
             enc_output: (batch, text_len, word_emb_len)
             src_mask: (batch, text_len) ==> unsqueeze(-2) ==> (batch, 1, text_len)
             """
-            enc_output , enc_slf_attn = enc_layer(enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
-            enc_slf_attn_list += [enc_slf_attn] if return_attns else []
-            
+            enc_output , _ = enc_layer(enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
+           
         return enc_output
 
 class Discriminator(nn.Module):
@@ -74,7 +68,7 @@ class Discriminator(nn.Module):
                                                         d_k=cfg.D_K_LIST_D[i], 
                                                         d_v=cfg.D_V_LIST_D[i], 
                                                         dropout=cfg.DROPOUT_D)
-                                                        for i in range(cfg.N_LAYERS_D-1, 0-1, -1)])
+                                                        for i in range(cfg.N_LAYERS_D)])
         self.encoder_last = EncoderLayer(d_model=6, 
                                         d_inner=24, 
                                         d_out =1,
@@ -85,10 +79,7 @@ class Discriminator(nn.Module):
 
         self.fc = nn.Linear(24, 1, bias=False)
 
-
     def forward(self, so3, text_vec, src_mask):
-        input_vec = torch.cat((so3, text_vec), -1)
-
         # -- Forward
         input_vec = text_vec.clone()
         """這裡應該不用每一層都做， 圖片上的normalize還有dropout在PositionwiseFeedForward"""
@@ -106,7 +97,8 @@ class Discriminator(nn.Module):
         
         # (128, 24, 3+3)
         so3_enc_output = torch.cat((so3, enc_output), -1)
-        output =  self.encoder_last(so3_enc_output, slf_attn_mask=None)
+        output, _ =  self.encoder_last(so3_enc_output, slf_attn_mask=None)
+        output = self.fc(output.view(self.cfg.BATCH_SIZE, -1))
         return output
 
 

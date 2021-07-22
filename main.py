@@ -31,10 +31,8 @@ if __name__ == "__main__":
         text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
         text_match_mask = batch.get('vec_mask').to(device)
         noise1 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
-        print(so3_real[0])
         with torch.no_grad():
-            so3_fake = net_g(noise1, text_match, text_match_mask)
+            score_right = net_d(so3_real, text_match, text_match_mask)
             print("嘻嘻")
-            print(so3_fake.size())
-            print(so3_fake[0])
+            print(score_right)
             break
