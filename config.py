@@ -17,6 +17,7 @@ __C.USE_TENSORBOARD = False
 
 __C.START_FROM_EPOCH = 0#200
 __C.END_IN_EPOCH = 1#1200
+__C.CHKPT_PATH = project_dir + '/models/checkpoints'
 
 # coco
 __C.DATA_DIR = my_dir + "/datasets/coco"
@@ -44,22 +45,35 @@ __C.N_train_D_1_train_G = 5 # train discriminator k times before training genera
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 0.0004
 __C.LEARNING_RATE_D = 0.0004
-__C.NOISE_SIZE = 128
+__C.NOISE_SIZE = 300
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
 __C.JOINT_NUM = 24
 __C.MAX_SENTENCE_LEN = 24
-# Model
-__C.N_LAYERS = 3
-__C.D_INNER_SCALE = 2
+
 __C.D_WORD_VEC = 300
-__C.D_MODEL_LIST = [600,75,15] 
-__C.N_HEAD_LIST = [8,5,5]
-__C.D_K_LIST = [75,15,3] # 這裡我實在不知道d_k和d_model之間到底要不要有N_head的倍數關西?
-__C.D_V_LIST = __C.D_K_LIST
-__C.DROPOUT = 0.1
-__C.N_POSITION = 200
-__C.SCALE_EMB = False
+# Model g
+__C.N_LAYERS_G = 3
+__C.D_INNER_SCALE_G = 2
+__C.D_MODEL_LIST_G = [600,75,15,3] 
+__C.N_HEAD_LIST_G = [8,5,5]
+__C.D_K_LIST_G = [75,15,3] 
+__C.D_V_LIST_G = __C.D_K_LIST_G
+__C.DROPOUT_G = 0.1
+__C.N_POSITION_G = 200
+__C.SCALE_EMB_G = False
+
+
+# Model d
+__C.N_LAYERS_D = 3
+__C.D_INNER_SCALE_D = 2
+__C.D_MODEL_LIST_D = [300,60,12,3] 
+__C.N_HEAD_LIST_D = [5,5,4]
+__C.D_K_LIST_D = [60,12,3] 
+__C.D_V_LIST_D = __C.D_K_LIST_D
+__C.DROPOUT_D = 0.1
+__C.N_POSITION_D = 200
+__C.SCALE_EMB_D = False
 
 # ADAM solver
 __C.BETA_1 = 0.0

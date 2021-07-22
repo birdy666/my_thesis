@@ -26,20 +26,6 @@ lamb = 10
 alpha = 1
 
 
-def saveModel_plotGenerative(net_g, net_d, fixedData, suffix, skeleton):
-    # save models before training
-    torch.save(net_g.state_dict(), generator_path + '_' + suffix)
-    torch.save(net_d.state_dict(), discriminator_path + '_' + suffix)
-    # plot and save generated samples from fixed noise (before training begins)
-    net_g.eval()    
-    with torch.no_grad():
-        """
-        每個row有5張對應到不同語句的假pose，用的都是同樣的noise。所以這裡用repeat_interleave(5, dim=0)
-        每個text會場生6張假pose，所以用repeat(6, 1, 1, 1))
-        """
-        fixed_fake = net_g(fixedData.noise.repeat_interleave(fixedData.w, dim=0), fixedData.text.repeat(fixedData.h, 1, 1, 1))
-    plot_generative_samples_from_noise(fixed_fake, fixedData.real_array, fixedData.caption, fixedData.w, fixedData.h, multi, skeleton, start_from_epoch)
-
 def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch):
     net_d.train()
     loss_d = torch.tensor(0)
@@ -50,18 +36,19 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
     text_mismatch = batch.get('vec_mismatch').to(device)
+    text_mismatch_mask = batch.get('vec_mismatch_mask').to(device)
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
 
     """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
     fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
     # discriminate heatmpap-text pairs
-    score_right = net_d(so3_real, text_match)
-    score_wrong = net_d(so3_real, text_mismatch)
+    score_right = net_d(so3_real, text_match, text_match_mask)
+    score_wrong = net_d(so3_real, text_mismatch, text_mismatch_mask)
 
     # generate so3, 這裡要detach是因為我們是更新net_d不是net_g
     so3_fake = net_g(noise, text_match, text_match_mask)
     # discriminate so3-text pairs
-    score_fake = net_d(so3_fake.detach(), text_match)
+    score_fake = net_d(so3_fake.detach(), text_match, text_match_mask)
 
     if algorithm == 'gan':
         # torch.full(size, fill_value, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
@@ -134,11 +121,11 @@ def update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch):
 
     # generate so3
     so3_fake = net_g(noise1, text_match, text_match_mask)
-    so3__interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
+    so3_interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
 
     # discriminate heatmpap-text pairs
-    score_fake = net_d(so3_fake, text_match)
-    score_interpolated = net_d(so3__interpolated, text_interpolated)
+    score_fake = net_d(so3_fake, text_match, text_match_mask)
+    score_interpolated = net_d(so3_interpolated, text_interpolated, text_interpolated_mask)
 
     if algorithm == 'gan':
         label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
@@ -161,7 +148,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     iteration = 1    
     total_loss_g = 0
     total_loss_d = 0
-    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   '), leave=False):        
+    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=False)):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
         total_loss_d += loss_d
@@ -186,13 +173,14 @@ def get_d_loss(cfg, device, net_g, net_d, criterion, batch):
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
     text_mismatch = batch.get('vec_mismatch').to(device)
+    text_mismatch_mask = batch.get('vec_mismatch_mask').to(device)
     # calculate d loss
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     with torch.no_grad():
-        score_right = net_d(so3_real, text_match).detach()
-        score_wrong = net_d(so3_real, text_mismatch).detach()
+        score_right = net_d(so3_real, text_match, text_match_mask).detach()
+        score_wrong = net_d(so3_real, text_mismatch, text_mismatch_mask).detach()
         so3_fake = net_g(noise, text_match, text_match_mask).detach()
-        score_fake = net_d(so3_fake, text_match).detach()
+        score_fake = net_d(so3_fake, text_match, text_match_mask).detach()
 
     if algorithm == 'gan':
         label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
@@ -241,8 +229,8 @@ def get_g_loss(cfg, device, net_g, net_d, criterion, batch):
         so3_fake = net_g(noise1, text_match, text_match_mask)
         so3__interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
             
-        score_fake = net_d(so3_fake, text_match).detach()
-        score_interpolated = net_d(so3__interpolated, text_interpolated).detach()
+        score_fake = net_d(so3_fake, text_match, text_match_mask).detach()
+        score_interpolated = net_d(so3__interpolated, text_interpolated, text_interpolated_mask).detach()
     if algorithm == 'gan':
         label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
         loss_g = criterion(score_fake.view(-1), label) + criterion(score_interpolated.view(-1), label)
@@ -258,7 +246,7 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
 
     total_loss_g = 0
     total_loss_d = 0
-    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   '), leave=False):
+    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   ', leave=False)):
         # calculate d loss
         loss_d = get_d_loss(cfg, device, net_g, net_d, criterion, batch)
         total_loss_d += loss_d.item()
@@ -275,13 +263,11 @@ def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d):
                 header=f"({header})", loss_g=loss_g,
                 loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
 
-def save_models(e, net_g, path_g, net_d, path_d,  save_mode='all'):
-    checkpoint_g = {'epoch': e, 'model': net_g.state_dict()}
-    checkpoint_d = {'epoch': e, 'model': net_g.state_dict()}
+def save_models(e, net_g, net_d, chkpt_path,  save_mode='all'):
+    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict()}
 
     if save_mode == 'all':
-        torch.save(checkpoint_g, path_g + "epoch" + str(e) + ".chkpt")
-        torch.save(checkpoint_d, path_d + "epoch" + str(e) + ".chkpt")
+        torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")
     elif save_mode == 'best':
         pass
         """model_name = 'model.chkpt'
@@ -320,7 +306,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         # print progress
         print(' epoch ' + str(e) + ' val_loss_g: ' + str(val_loss_g) + ' val_loss_d ' + str(val_loss_d))
 
-        
+        save_models(e, net_g, net_d, cfg.CHKPT_PATH,  save_mode='all')
 
         # Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:
@@ -335,6 +321,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
             tb_writer.add_scalar('learning_rate_g', lr_g, e)
             tb_writer.add_scalar('learning_rate_d', lr_d, e)
         
+
 
     print('\nfinished')
 

@@ -104,7 +104,7 @@ class TheDataset(torch.utils.data.Dataset):
         item['vector'] = torch.tensor(data['vector'], dtype=torch.float32)
         item['vec_mask'] = torch.tensor(data['vec_mask'], dtype=torch.int)
         """unsqueeze_ is in place operation, unsqueeze isn't"""
-        item['vec_mismatch'] = self.get_text_mismatch(index)
+        item['vec_mismatch'], item['vec_mismatch_mask'] = self.get_text_mismatch(index)
         item['vec_interpolated'], item['vec_interpolated_mask'] = self.get_interpolated_text(0.5)
             
         return item
@@ -113,7 +113,7 @@ class TheDataset(torch.utils.data.Dataset):
     def get_text_mismatch(self, index):
         others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
         data_random = self.dataset[random.choice(others)]
-        return torch.tensor(data_random['vector'], dtype=torch.float32)
+        return data_random['vector'], data_random['vec_mask']
     
     # get a batch of random interpolated caption sentence vectors from the whole dataset
     # 預設mask我是用or但不確定合不合理?
@@ -124,7 +124,7 @@ class TheDataset(torch.utils.data.Dataset):
         vector2 = self.dataset[index2]['vector']
         mask = f_mask(self.dataset[index1]['vec_mask'], self.dataset[index2]['vec_mask'])
         # interpolate caption sentence vectors
-        return beta * vector1 + (1 - beta) * vector2, mask
+        return beta * vector1 + (1 - beta) * vector2, np.array(mask)
 
 
 if __name__ == "__main__":
@@ -149,8 +149,8 @@ if __name__ == "__main__":
     # torch.cat((noise_vector, sentence_vector), 1)
     # noise_tensor = torch.randn((number, noise_size, 1, 1), dtype=torch.float32)
     for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):
-        print(batch.get('vector').shape)
-        print(batch.get('vec_mask').shape)
-        print(batch.get('vec_mask').unsqueeze(-2).unsqueeze(1).shape)
+        """noise_tensor = torch.randn((number, 300, 1, 1), dtype=torch.float32)
+        torch.cat((batch.get('vector'), noise_tensor), 1)"""
+        print(batch.get('so3').size())
         
         break
