@@ -32,3 +32,4 @@ if __name__ == "__main__":
     criterion = nn.BCELoss()
 
     train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val)
+    

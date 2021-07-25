@@ -16,7 +16,7 @@ __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
 __C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 5#1200
+__C.END_IN_EPOCH = 200#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 
 # coco
@@ -76,8 +76,8 @@ __C.N_POSITION_D = 200
 __C.SCALE_EMB_D = False
 
 # ADAM solver
-__C.BETA_1 = 0.0
-__C.BETA_2 = 0.9
+__C.BETA_1 = 0.9
+__C.BETA_2 = 0.98
 # numbers of channels of the convolutions
 __C.CONVOLUTION_CHANNEL_G = [256, 128, 64, 32]
 __C.CONVOLUTION_CHANNEL_D = [32, 64, 128, 256]

@@ -51,8 +51,7 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
     # generate so3, 這裡要detach是因為我們是更新net_d不是net_g
     so3_fake = net_g(noise, text_match, text_match_mask)
     # discriminate so3-text pairs
-    score_fake = net_d(so3_fake.detach(), text_match, text_match_mask)
-
+    score_fake = net_d(so3_fake.detach(), text_match, text_match_mask)    
     if algorithm == 'gan':
         # torch.full(size, fill_value, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
         label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
@@ -153,7 +152,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     total_loss_d = 0
     for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=True)):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-        loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
+        loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)        
         total_loss_d += loss_d.item()
         
         """# log
@@ -284,7 +283,14 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
     if cfg.USE_TENSORBOARD:
         print("[Info] Use Tensorboard")  
         tb_writer = SummaryWriter(log_dir=os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))  
-        
+        batch = next(iter(dataLoader_train))
+        so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
+        text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
+        text_match_mask = batch.get('vec_mask').to(device)
+        noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
+        tb_writer.add_graph(net_d, (so3_real, text_match, text_match_mask))
+        tb_writer.add_graph(net_g, (noise, text_match, text_match_mask))
+       
     # create log files
     log_train_file = os.path.join(cfg.OUTPUT_DIR, 'train.log')
     log_valid_file = os.path.join(cfg.OUTPUT_DIR, 'valid.log')
