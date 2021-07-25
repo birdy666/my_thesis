@@ -41,7 +41,7 @@ __C.SENTENCE_VECTOR_SIZE = 300
 __C.SMPL_MODEL_PATH = my_dir + "/datasets/smpl/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
 
 # training
-__C.N_train_D_1_train_G = 10 # train discriminator k times before training generator
+__C.N_train_D_1_train_G = 5 # train discriminator k times before training generator
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 0.00001
 __C.LEARNING_RATE_D = 0.00001

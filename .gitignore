@@ -2,9 +2,9 @@
 /.ipynb_checkpoints
 __pycache__/
 /output
-/models/checkpoints
-/models/discriminator
-/models/generator
+/models
 /render_eft
 /render_eft_fake
 /demo
+/output_01
+/output_02

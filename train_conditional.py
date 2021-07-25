@@ -147,7 +147,7 @@ def update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch):
 def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train):
     print('learning rate: g ' + str(optimizer_g._optimizer.param_groups[0].get('lr')) + ' d ' + str(
             optimizer_d._optimizer.param_groups[0].get('lr')))
-    iteration = 1    
+    iteration = 0    
     total_loss_g = 0
     total_loss_d = 0
     for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=True)):        
@@ -158,7 +158,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         """# log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
         # after training discriminator for N times, train gernerator for 1 time
-        if iteration == cfg.N_train_D_1_train_G:
+        if (i+1) % cfg.N_train_D_1_train_G == 0:
             # (2) Update G network: maximize log(D(G(z)))
             loss_g = update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch)
             total_loss_g += loss_g.item()
@@ -336,9 +336,6 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    mask = torch.tensor([[1,1,0,0]])
-
-    a = torch.tensor([[1,1,1,0],
-                    [2,2,2,0],
-                    [3,3,3,3]])
-    print(a.masked_fill(mask == 0, -1e9))
+    print(5%6)
+    print(12%6)
+    print(7%6)
