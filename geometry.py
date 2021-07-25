@@ -21,6 +21,22 @@ def rotation2so3(R):
     axis, angle = rotation2AxisAngle(R)
     return angle * axis
 
+# Euler–Rodrigues formula
+def so32rotation(so3):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    theta = math.sqrt(np.dot(so3, so3))
+    axis = so3 / theta
+    a = math.cos(theta / 2.0)
+    b, c, d = -axis * math.sin(theta / 2.0)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    return ([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                     [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                     [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+
 
 if __name__ == "__main__":
     R = [[0.7912924885749817, 0.044100284576416016, -0.6098452806472778], 

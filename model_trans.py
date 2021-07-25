@@ -13,7 +13,7 @@ def getModels(cfg, device, checkpoint=None):
     if checkpoint != None:
         print("Start from epoch " + str(cfg.START_FROM_EPOCH))        
         net_g.load_state_dict(checkpoint['model_g'])        
-        net_g.load_state_dict(checkpoint['model_d'])
+        net_d.load_state_dict(checkpoint['model_d'])
         print("Model loaded")
     else:
         net_g.apply(init_weight)

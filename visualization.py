@@ -25,7 +25,12 @@ parser.add_argument('--fit_data',default="eft_fit/MPII_ver01.json", type=str, he
 parser.add_argument('--smpl_dir',default="./extradata/smpl", type=str , help='Folder path where smpl pkl files exist')
 parser.add_argument('--onbbox',action="store_true", help="Show the 3D pose on bbox space")
 parser.add_argument('--rendermode',default="geo", help="Choose among geo, normal, densepose")
-parser.add_argument('--render_dir',default="render_eft", help="Folder to save rendered images")
+
+
+parser.add_argument('--render_dir',default="render_eft_fake", help="Folder to save rendered images")
+#parser.add_argument('--render_dir',default="render_eft", help="Folder to save rendered images")
+
+
 parser.add_argument('--waitforkeys',action="store_true", help="If true, it will pasue after each visualizing each sample, waiting for any key pressed")
 parser.add_argument('--turntable',action="store_true", help="If true, show turn table views")
 parser.add_argument('--multi',action="store_true", help='If True, show all available fitting people per image. Default, visualize a single person at each time')
@@ -214,18 +219,20 @@ def visEFT_singleSubject(renderer, eft_data_all):
         if True:    
             if os.path.exists(args.render_dir) == False:
                 os.mkdir(args.render_dir)
-            render_output_path = args.render_dir + '/render_{}_eft{:08d}.jpg'.format(imgName[:-4],idx)
+            #render_output_path = args.render_dir + '/render_{}_eft{:08d}.jpg'.format(imgName[:-4],idx)
+            render_output_path = args.render_dir + '/render_eft{:08d}.jpg'.format(idx)
             print(f"Save to {render_output_path}")
             cv2.imwrite(render_output_path, saveImg)
-        break
+        
 
 if __name__ == '__main__':
     #('--rendermode',default="geo", help="Choose among geo, normal, densepose")
     renderer = meshRenderer.meshRenderer()
     renderer.setRenderMode('geo')
     renderer.offscreenMode(True)
-
-    with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
+    #with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
+    with open('./demo/eft_50.json','r') as f:
         eft_all_with_caption = json.load(f)
+        eft_all_with_caption = eft_all_with_caption[:20]
     visEFT_singleSubject(renderer,eft_all_with_caption)
 

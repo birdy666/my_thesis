@@ -29,10 +29,11 @@ def get_caption_vector(text_model, caption_without_punctuation, max_sentence_len
     return np.array(pad_vector(vectors, max_sentence_len, d_word_vec)), mask
     #return text_model.get_sentence_vector(caption.replace('\n', '').lower()) * encoding_weight
 
+"""TODO 24is hyperparameter"""
 # get a batch of noise vectors
-def get_noise_tensor(batch_size, noise_size):
+def get_noise_tensor(batch_size,  noise_size):
     """batch_size x 24 x 300"""
-    noise_tensor = torch.randn((128, 24, 300), dtype=torch.float32)
+    noise_tensor = torch.randn((batch_size, 24, noise_size), dtype=torch.float32)
     return noise_tensor
 
 if __name__ == "__main__":

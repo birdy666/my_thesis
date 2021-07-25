@@ -5,3 +5,6 @@ __pycache__/
 /models/checkpoints
 /models/discriminator
 /models/generator
+/render_eft
+/render_eft_fake
+/demo
