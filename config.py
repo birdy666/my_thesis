@@ -13,10 +13,10 @@ __C = edict()
 cfg = __C
 
 __C.CUDA = True
-__C.USE_TENSORBOARD = False
+__C.USE_TENSORBOARD = True
 
 __C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 1#1200
+__C.END_IN_EPOCH = 5#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 
 # coco
@@ -41,15 +41,15 @@ __C.SENTENCE_VECTOR_SIZE = 300
 __C.SMPL_MODEL_PATH = my_dir + "/datasets/smpl/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
 
 # training
-__C.N_train_D_1_train_G = 5 # train discriminator k times before training generator
+__C.N_train_D_1_train_G = 10 # train discriminator k times before training generator
 __C.BATCH_SIZE = 128
-__C.LEARNING_RATE_G = 0.0004
-__C.LEARNING_RATE_D = 0.0004
+__C.LEARNING_RATE_G = 0.00001
+__C.LEARNING_RATE_D = 0.00001
 __C.NOISE_SIZE = 300
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
 __C.JOINT_NUM = 24
-__C.MAX_SENTENCE_LEN = 24
+__C.MAX_SENTENCE_LEN = __C.JOINT_NUM
 
 __C.D_WORD_VEC = 300
 # Model g

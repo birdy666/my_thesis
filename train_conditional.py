@@ -6,8 +6,9 @@ import numpy as np
 import os
 from tqdm import tqdm
 from time import sleep
-
+from torch.utils.tensorboard import SummaryWriter 
 from utils import get_noise_tensor
+
 
 # algorithms: gan, wgan, wgan-gp, wgan-lp
 # gan: k = 1, beta_1 = 0.5, beta_2 = 0.999, lr = 0.0001, epoch = 50~300
@@ -15,6 +16,8 @@ from utils import get_noise_tensor
 # wgan-gp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 20, epoch = 200~1200
 # wgan-lp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 150, epoch = 200~1200
 algorithm = 'wgan'
+
+LOSS_SCALE = 10000000000
 
 # weight clipping (WGAN)
 c = 0.01
@@ -66,12 +69,12 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
 
         # calculate losses and update
         loss_d = loss_right + loss_fake + loss_wrong
-        optimizer_d.step()
+        optimizer_d.step_and_update_lr()
     elif algorithm == 'wgan':
         # calculate losses and update
         loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right).mean()
         loss_d.backward()
-        optimizer_d.step()
+        optimizer_d.step_and_update_lr()
         # clipping
         for p in net_d.parameters():
             p.data.clamp_(-c, c)
@@ -133,33 +136,33 @@ def update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch):
 
         # calculate losses and update
         loss_g.backward()
-        optimizer_g.step()
+        optimizer_g.step_and_update_lr()
     else:
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         # calculate losses and update
         loss_g = -(score_fake + score_interpolated).mean()
         loss_g.backward()
-        optimizer_g.step()
+        optimizer_g.step_and_update_lr()
     return loss_g
 
 def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train):
-    print('learning rate: g ' + str(optimizer_g.param_groups[0].get('lr')) + ' d ' + str(
-            optimizer_d.param_groups[0].get('lr')))
+    print('learning rate: g ' + str(optimizer_g._optimizer.param_groups[0].get('lr')) + ' d ' + str(
+            optimizer_d._optimizer.param_groups[0].get('lr')))
     iteration = 1    
     total_loss_g = 0
     total_loss_d = 0
-    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=False)):        
+    for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=True)):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)
-        total_loss_d += loss_d
+        total_loss_d += loss_d.item()
+        
         """# log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
-
         # after training discriminator for N times, train gernerator for 1 time
         if iteration == cfg.N_train_D_1_train_G:
             # (2) Update G network: maximize log(D(G(z)))
-            loss_g = update_generator()
-            total_loss_g += loss_g
+            loss_g = update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch)
+            total_loss_g += loss_g.item()
             """# log
             writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)"""
 
@@ -246,7 +249,7 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
 
     total_loss_g = 0
     total_loss_d = 0
-    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   ', leave=False)):
+    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   ', leave=True)):
         # calculate d loss
         loss_d = get_d_loss(cfg, device, net_g, net_d, criterion, batch)
         total_loss_d += loss_d.item()
@@ -257,14 +260,15 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
 
     return total_loss_g, total_loss_d   
 
-def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d):
-    print('  - {header:12} loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
+def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
+    print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
             'elapse: {elapse:3.3f} min'.format(
-                header=f"({header})", loss_g=loss_g,
+                e = e, header=f"({header})", loss_g=loss_g,
                 loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
 
-def save_models(e, net_g, net_d, chkpt_path,  save_mode='all'):
-    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict()}
+def save_models(e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
+    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(),
+                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d}
 
     if save_mode == 'all':
         torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")
@@ -278,9 +282,9 @@ def save_models(e, net_g, net_d, chkpt_path,  save_mode='all'):
 def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val):   
     # tensorboard
     if cfg.USE_TENSORBOARD:
-        print("[Info] Use Tensorboard")    
-        from torch.utils.tensorboard import SummaryWriter 
-        tb_writer = SummaryWriter(log_dir=os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))    
+        print("[Info] Use Tensorboard")  
+        tb_writer = SummaryWriter(log_dir=os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))  
+        
     # create log files
     log_train_file = os.path.join(cfg.OUTPUT_DIR, 'train.log')
     log_valid_file = os.path.join(cfg.OUTPUT_DIR, 'valid.log')
@@ -289,24 +293,23 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         log_tf.write('epoch,loss_g,loss_d\n')
         log_vf.write('epoch,loss_g,loss_d\n')    
 
-    for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):        
+    for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):   
+        print("=====================Epoch " + str(e) + " start!=====================")     
         # Train!!
         start = time.time()
         train_loss_g, train_loss_d = train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train)
-        lr_g=optimizer_g.param_groups[0].get('lr')
-        lr_d=optimizer_d.param_groups[0].get('lr')
-        print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d)
-        # print progress
-        print(' epoch ' + str(e) + ' train_loss_g: ' + str(train_loss_g) + ' train_loss_d ' + str(train_loss_d))
+        lr_g=optimizer_g._optimizer.param_groups[0].get('lr')
+        lr_d=optimizer_d._optimizer.param_groups[0].get('lr')
+        print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d, e)
+        
 
         # Evaluate!!
         start = time.time()
         val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
-        print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d)
-        # print progress
-        print(' epoch ' + str(e) + ' val_loss_g: ' + str(val_loss_g) + ' val_loss_d ' + str(val_loss_d))
+        print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
+        
 
-        save_models(e, net_g, net_d, cfg.CHKPT_PATH,  save_mode='all')
+        save_models(e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
 
         # Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:

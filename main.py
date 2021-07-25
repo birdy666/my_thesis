@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
+from optim import ScheduledOptim
 
 from config import cfg
 from train_conditional import train
@@ -12,27 +13,22 @@ from utils import get_noise_tensor
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
-    text_model, eft_all_with_caption, dataset_train, dataset_val = getData(cfg)
-    net_g, net_d = getModels(cfg) 
+    checkpoint = None
+    if cfg.START_FROM_EPOCH > 0:
+        checkpoint = torch.load(cfg.CHKPT_PATH + "/epoch_" + str(cfg.START_FROM_EPOCH) + ".chkpt")
+    text_model, eft_all_with_caption, dataset_train, dataset_val = getData(cfg)    
+    net_g, net_d = getModels(cfg, device, checkpoint) 
 
-    #dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
-    dataLoader_val = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=False)
+    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS, drop_last=True)
+    dataLoader_val = torch.utils.data.DataLoader(dataset_val, batch_size=cfg.BATCH_SIZE, shuffle=False, drop_last=True)
     
-    #optimizer_g = torch.optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2))
-    #optimizer_d = torch.optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2))
-    #criterion = nn.BCELoss()
-    #train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val)
+    # 這裡原本論文因為輸入輸出一樣 所以他這裡直接把d_model當作一個像是常數的參數 但我的模型不一樣 ...
+    optimizer_g = ScheduledOptim(
+        torch.optim.Adam(net_g.parameters(), betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09),
+        lr_mul=2.0, d_model=300, n_warmup_steps=4000, n_steps=checkpoint['n_steps_g'] if checkpoint!=None else 0)
+    optimizer_d = ScheduledOptim(
+        torch.optim.Adam(net_d.parameters(), betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09),
+        lr_mul=2.0, d_model=300, n_warmup_steps=4000, n_steps=checkpoint['n_steps_d'] if checkpoint!=None else 0)    
+    criterion = nn.BCELoss()
 
-    print("YOOOOOOOOOOOOOOOOOOO")
-    for i, batch in enumerate(tqdm(dataLoader_val, desc='  - (Validation)   ', leave=True)):
-        net_g.eval()
-        net_d.eval()
-        so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
-        text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
-        text_match_mask = batch.get('vec_mask').to(device)
-        noise1 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
-        with torch.no_grad():
-            score_right = net_d(so3_real, text_match, text_match_mask)
-            print("嘻嘻")
-            print(score_right)
-            break
+    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val)

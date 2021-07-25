@@ -1,21 +1,31 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from transformer import PositionalEncoding, EncoderLayer
 from utils import get_noise_tensor
 
-def getModels(cfg):
-    net_g = Generator(cfg)
-    net_d = Discriminator(cfg)
-    if cfg.START_FROM_EPOCH > 0:
-        print("Start from epoch " + str(cfg.START_FROM_EPOCH))
-        checkpoint = torch.load(cfg.CHKPT_PATH + "/epoch_" + str(cfg.START_FROM_EPOCH) + ".chkpt")
+
+
+def getModels(cfg, device, checkpoint=None):
+    net_g = Generator(cfg).to(device)
+    net_d = Discriminator(cfg).to(device)
+    if checkpoint != None:
+        print("Start from epoch " + str(cfg.START_FROM_EPOCH))        
         net_g.load_state_dict(checkpoint['model_g'])        
         net_g.load_state_dict(checkpoint['model_d'])
         print("Model loaded")
     else:
+        net_g.apply(init_weight)
+        net_d.apply(init_weight)
         print("Start a new training from epoch 0")
     return net_g, net_d
+
+
+def init_weight(m):
+    if type(m) == nn.Linear:
+        nn.init.xavier_uniform(m.weight.data, 1.)
+
 
 # basically Encoder
 class Generator(nn.Module):
@@ -98,7 +108,8 @@ class Discriminator(nn.Module):
         # (128, 24, 3+3)
         so3_enc_output = torch.cat((so3, enc_output), -1)
         output, _ =  self.encoder_last(so3_enc_output, slf_attn_mask=None)
-        output = self.fc(output.view(self.cfg.BATCH_SIZE, -1))
+        output = self.fc(output.view(-1, self.cfg.JOINT_NUM))
+        #output = F.sigmoid(output)
         return output
 
 

@@ -151,6 +151,6 @@ if __name__ == "__main__":
     for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):
         """noise_tensor = torch.randn((number, 300, 1, 1), dtype=torch.float32)
         torch.cat((batch.get('vector'), noise_tensor), 1)"""
-        print(batch.get('so3').size())
+        print(batch.size()[0])
         
         break
