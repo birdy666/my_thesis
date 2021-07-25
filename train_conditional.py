@@ -298,7 +298,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
     with open(log_train_file, 'w') as log_tf, open(log_valid_file, 'w') as log_vf:
         log_tf.write('epoch,loss_g,loss_d\n')
         log_vf.write('epoch,loss_g,loss_d\n')    
-
+    start_of_all_training = time.time()
     for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):   
         print("=====================Epoch " + str(e) + " start!=====================")     
         # Train!!
@@ -331,8 +331,8 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
             tb_writer.add_scalar('learning_rate_d', lr_d, e)
         
 
-
-    print('\nfinished')
+    elapse=(time.time()-start_of_all_training)/60
+    print('\nfinished! ' + str(elapse) + "minutes")
 
 
 if __name__ == "__main__":
