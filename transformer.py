@@ -53,7 +53,7 @@ class ScaledDotProductAttention(nn.Module):
 
 class MultiHeadAttention(nn.Module):
     ''' Multi-Head Attention module '''
-
+    # 0727 新增_d_out
     def __init__(self, n_head, d_model, d_k, d_v, dropout=0.1):
         super().__init__()
         self.n_head = n_head
@@ -64,10 +64,12 @@ class MultiHeadAttention(nn.Module):
 
         # 多頭的attention基本上就是有n個q, k
         # nn.Linear(512, 8 * 64, bias=False) ==> 512x512的矩陣
-        # 他基本上把8個head地個不同矩陣黏一起所以forward時才會再用view把512拆成 8, 64
+        # 他基本上把8個head的不同矩陣黏一起所以forward時才會再用view把512拆成 8, 64
         self.w_qs = nn.Linear(d_model, n_head * d_k, bias=False)
         self.w_ks = nn.Linear(d_model, n_head * d_k, bias=False)
         self.w_vs = nn.Linear(d_model, n_head * d_v, bias=False)
+        # 補充講義上的W0 用來把全部黏再一起的z0~zn變回d_model長， 但這裡要注意的是我的d_model != n_head * d_k
+        # 為啥不在這裡直接把惟度轉換成d_out是因為下面還有一個residual,如果in/out不同維度很麻煩
         self.fc = nn.Linear(n_head * d_v, d_model, bias=False)
 
         self.attention = ScaledDotProductAttention(temperature=d_k ** 0.5)
@@ -120,12 +122,15 @@ class MultiHeadAttention(nn.Module):
         q: (batch, head, text_len , d_k) ==> (batch, text_len, head*d_k)
         """
         q = q.transpose(1, 2).contiguous().view(sz_b, len_q, -1)
+        """
+        q: (batch, text_len, head*d_k) ==> (batch, text_len, d_model)
+        """
         q = self.dropout(self.fc(q))
         q += residual
 
         q = self.layer_norm(q)
         """
-        q: (batch, text_len, head*d_k)
+        q: (batch, text_len, d_model)
         attn: (batch, head, text_len, text_len)
         """
         return q, attn
@@ -141,7 +146,6 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-
         residual = x
 
         x = self.w_2(F.relu(self.w_1(x)))
@@ -159,19 +163,26 @@ class EncoderLayer(nn.Module):
         self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
         self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout)
         # 7/22新增 因為原版的輸入輸出一樣維度 這裡做降維
+        # 參考 MultiHeadAttention forward中fc的註解
         self.fc = nn.Linear(d_model, d_out, bias=False)
         self.layer_norm = nn.LayerNorm(d_out, eps=1e-6)
 
     def forward(self, enc_input, slf_attn_mask=None):
         # 這裡的output是多頭產生的結果，並黏在一起
         """
-        enc_input:  (batch, text_len, head*d_k)
+        enc_input:  (batch, text_len, d_model)
         slf_attn_mask:  (batch, 1, text_len)
-        enc_slf_attn: (batch, head, text_len, text_len)
         """
         # enc_input & enc_output have the same shape in the paper, 
+        """
+        enc_output: (batch, text_len, d_model)
+        enc_slf_attn: (batch, head, text_len, text_len)
+        """
         enc_output, enc_slf_attn = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
         enc_output = self.pos_ffn(enc_output)
+        """
+        enc_output: (batch, text_len, d_model) ==> (batch, text_len, d_out)
+        """
         enc_output = self.fc(enc_output)
         enc_output = self.layer_norm(enc_output)
         return enc_output, enc_slf_attn
