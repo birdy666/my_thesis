@@ -265,9 +265,9 @@ def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
                 e = e, header=f"({header})", loss_g=loss_g,
                 loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
 
-def save_models(e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
+def save_models(cfg, e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
     checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(),
-                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d}
+                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d, 'cfg':cfg}
 
     if save_mode == 'all':
         torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")
@@ -315,7 +315,9 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
 
-        save_models(e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
+        save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
+        elapse_mid=(time.time()-start_of_all_training)/60
+        print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes")
 
         # Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:
@@ -331,11 +333,13 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
             tb_writer.add_scalar('learning_rate_d', lr_d, e)
         
 
-    elapse=(time.time()-start_of_all_training)/60
-    print('\nfinished! ' + str(elapse) + "minutes")
+    elapse_final=(time.time()-start_of_all_training)/60
+    print('\nfinished! ' + str(elapse_final) + " minutes")
 
 
 if __name__ == "__main__":
     print(5%6)
     print(12%6)
     print(7%6)
+    from config import cfg
+    print(cfg)

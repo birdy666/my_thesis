@@ -16,7 +16,7 @@ __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
 __C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 200#1200
+__C.END_IN_EPOCH = 300#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 
 # coco
@@ -41,7 +41,7 @@ __C.SENTENCE_VECTOR_SIZE = 300
 __C.SMPL_MODEL_PATH = my_dir + "/datasets/smpl/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
 
 # training
-__C.N_train_D_1_train_G = 5 # train discriminator k times before training generator
+__C.N_train_D_1_train_G = 10 # train discriminator k times before training generator
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 0.00001
 __C.LEARNING_RATE_D = 0.00001
@@ -75,9 +75,13 @@ __C.DROPOUT_D = 0.1
 __C.N_POSITION_D = 200
 __C.SCALE_EMB_D = False
 
+# OPtimizer
 # ADAM solver
 __C.BETA_1 = 0.9
 __C.BETA_2 = 0.98
+__C.N_WARMUP_STEPS_G = 3000
+__C.N_WARMUP_STEPS_D = 3000
+
 # numbers of channels of the convolutions
 __C.CONVOLUTION_CHANNEL_G = [256, 128, 64, 32]
 __C.CONVOLUTION_CHANNEL_D = [32, 64, 128, 256]

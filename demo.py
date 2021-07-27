@@ -7,13 +7,13 @@ from utils import get_noise_tensor, get_caption_vector
 import string
 from pycocotools.coco import COCO
 import fasttext
-from geometry import so32rotation
+from geometry import so32rotation, rotation2so3
 import numpy as np
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints' + "/epoch_110"  + ".chkpt")
+    checkpoint = torch.load('./models/checkpoints_02' + "/epoch_135"  + ".chkpt")
     net_g = Generator(cfg).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
@@ -22,6 +22,7 @@ if __name__ == "__main__":
     
     with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
         eft_all_with_caption = json.load(f)
+  
     
     eft_all_fake = copy.deepcopy(eft_all_with_caption)
     eft_all_fake = eft_all_fake[:20]
