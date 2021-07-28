@@ -79,18 +79,18 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
             p.data.clamp_(-c, c)
     else:
         print("先不測試ㄌ")
-        """# 'wgan-gp' and 'wgan-lp'
+        # 'wgan-gp' and 'wgan-lp'
         # random sample
         epsilon = np.random.rand(cfg.BATCH_SIZE)
-        heatmap_sample = torch.empty_like(heatmap_real)
+        so3_sample = torch.empty_like(so3_real)
         for j in range(cfg.BATCH_SIZE):
-            heatmap_sample[j] = epsilon[j] * heatmap_real[j] + (1 - epsilon[j]) * heatmap_fake[j]
-        heatmap_sample.requires_grad = True
+            so3_sample[j] = epsilon[j] * so3_real[j] + (1 - epsilon[j]) * so3_fake[j]
+        so3_sample.requires_grad = True
         text_match.requires_grad = True
 
         # calculate gradient penalty
-        score_sample = net_d(heatmap_sample, text_match)
-        gradient_h, gradient_t = grad(score_sample, [heatmap_sample, text_match], torch.ones_like(score_sample),
+        score_sample = net_d(so3_sample, text_match)
+        gradient_h, gradient_t = grad(score_sample, [so3_sample, text_match], torch.ones_like(score_sample),
                                         create_graph=True)
         gradient_norm = (gradient_h.pow(2).sum((1, 2, 3)) + gradient_t.pow(2).sum((1, 2, 3))).sqrt()
 
@@ -104,7 +104,7 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
                 torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()
 
         loss_d.backward()
-        optimizer_d.step()"""
+        optimizer_d.step_and_update_lr()
         
     return loss_d
 
@@ -195,27 +195,26 @@ def get_d_loss(cfg, device, net_g, net_d, criterion, batch):
     elif algorithm == 'wgan':
         loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right).mean()
     else:
-        print("先不測試ㄌ")
-        """# 'wgan-gp' and 'wgan-lp'
-        epsilon_val = np.random.rand(dataset_val.__len__())
-        heatmap_sample_val = torch.empty_like(heatmap_real_val)
-        for j in range(dataset_val.__len__()):
-            heatmap_sample_val[j] = epsilon_val[j] * heatmap_real_val[j] + (1 - epsilon_val[j]) * heatmap_fake_val[j]
+        # 'wgan-gp' and 'wgan-lp'
+        epsilon_val = np.random.rand(cfg.BATCH_SIZE)
+        heatmap_sample_val = torch.empty_like(so3_real)
+        for j in range(cfg.BATCH_SIZE):
+            heatmap_sample_val[j] = epsilon_val[j] * so3_real[j] + (1 - epsilon_val[j]) * so3_fake[j]
         heatmap_sample_val.requires_grad = True
-        text_match_val.requires_grad = True
-        score_sample_val = net_d(heatmap_sample_val, text_match_val)
-        gradient_h_val, gradient_t_val = grad(score_sample_val, [heatmap_sample_val, text_match_val],
+        text_match.requires_grad = True
+        score_sample_val = net_d(heatmap_sample_val, text_match)
+        gradient_h_val, gradient_t_val = grad(score_sample_val, [heatmap_sample_val, text_match],
                                             torch.ones_like(score_sample_val), create_graph=True)
         gradient_norm_val = (gradient_h_val.pow(2).sum((1, 2, 3)) + gradient_t_val.pow(2).sum((1, 2, 3))).sqrt()
         if algorithm == 'wgan-gp':
-            loss_d_val = (score_fake_val + alpha * score_wrong_val - (1 + alpha) * score_right_val + lamb * (
+            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
                 (gradient_norm_val - 1).pow(2))).mean()
 
         else:
             # 'wgan-lp'
-                oss_d_val = (score_fake_val + alpha * score_wrong_val - (1 + alpha) * score_right_val + lamb * (
-                torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm_val - 1).pow(2))).mean()
-        """
+            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
+            torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm_val - 1).pow(2))).mean()
+       
     return loss_d
 
 def get_g_loss(cfg, device, net_g, net_d, criterion, batch):    
