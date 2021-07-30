@@ -2,7 +2,7 @@
 /.ipynb_checkpoints
 __pycache__/
 /models
-/render_eft
-/render_eft_fake
+/render_eft*
 /demo
 /output*
+/try_*

@@ -80,7 +80,7 @@ __C.D_INNER_SCALE_D = 2
 # ADAM solver
 __C.BETA_1 = 0.9
 __C.BETA_2 = 0.98
-__C.N_WARMUP_STEPS_G = 3000
+__C.N_WARMUP_STEPS_G = 2000
 __C.N_WARMUP_STEPS_D = 3000
 
 # numbers of channels of the convolutions

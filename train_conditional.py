@@ -1,3 +1,4 @@
+from math import nan
 import random
 import time
 from torch.autograd import grad
@@ -5,7 +6,6 @@ import torch
 import numpy as np
 import os
 from tqdm import tqdm
-from time import sleep
 from torch.utils.tensorboard import SummaryWriter 
 from utils import get_noise_tensor
 
@@ -15,7 +15,7 @@ from utils import get_noise_tensor
 # wgan: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.001, c = 0.01, epoch = 200~1200
 # wgan-gp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 20, epoch = 200~1200
 # wgan-lp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 150, epoch = 200~1200
-algorithm = 'wgan'
+algorithm = 'wgan-gp'
 
 LOSS_SCALE = 10000000000
 
@@ -44,14 +44,14 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
 
     """這裡和一般GAN不同的是他有三項，除了real, fake之外還多了一個wrong， 
     fake 是讓D能分辨出不合現實的pose，wrong是讓D能分辨出不對的描述"""
-    # discriminate heatmpap-text pairs
+    # discriminate so3-text pairs
     score_right = net_d(so3_real, text_match, text_match_mask)
     score_wrong = net_d(so3_real, text_mismatch, text_mismatch_mask)
 
     # generate so3, 這裡要detach是因為我們是更新net_d不是net_g
-    so3_fake = net_g(noise, text_match, text_match_mask)
+    so3_fake = net_g(noise, text_match, text_match_mask).detach()
     # discriminate so3-text pairs
-    score_fake = net_d(so3_fake.detach(), text_match, text_match_mask)    
+    score_fake = net_d(so3_fake, text_match, text_match_mask)    
     if algorithm == 'gan':
         # torch.full(size, fill_value, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
         label = torch.full((cfg.BATCH_SIZE,), 1, dtype=torch.float32, device=device)
@@ -78,22 +78,23 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
         for p in net_d.parameters():
             p.data.clamp_(-c, c)
     else:
-        print("先不測試ㄌ")
         # 'wgan-gp' and 'wgan-lp'
         # random sample
-        epsilon = np.random.rand(cfg.BATCH_SIZE)
-        so3_sample = torch.empty_like(so3_real)
+        """epsilon = torch.rand(cfg.BATCH_SIZE, 1, dtype=torch.float32)
+        epsilon = epsilon.expand(cfg.BATCH_SIZE, so3_real.nelement()//cfg.BATCH_SIZE).contiguous().view(cfg.BATCH_SIZE, so3_real.size()[-2], so3_real.size()[-1])"""
+        epsilon = torch.rand(cfg.BATCH_SIZE, dtype=torch.float32)
+        so3_sample = torch.empty_like(so3_real, dtype=torch.float32)
+        """so3_sample = epsilon * so3_real + ((1 - epsilon) * so3_fake)"""
         for j in range(cfg.BATCH_SIZE):
             so3_sample[j] = epsilon[j] * so3_real[j] + (1 - epsilon[j]) * so3_fake[j]
+        
         so3_sample.requires_grad = True
         text_match.requires_grad = True
-
         # calculate gradient penalty
-        score_sample = net_d(so3_sample, text_match)
+        score_sample = net_d(so3_sample, text_match, text_match_mask)
         gradient_h, gradient_t = grad(score_sample, [so3_sample, text_match], torch.ones_like(score_sample),
                                         create_graph=True)
-        gradient_norm = (gradient_h.pow(2).sum((1, 2, 3)) + gradient_t.pow(2).sum((1, 2, 3))).sqrt()
-
+        gradient_norm = (gradient_h.pow(2).sum((1, 2)) + gradient_t.pow(2).sum((1, 2))).sqrt()
         # calculate losses and update
         if algorithm == 'wgan-gp':
             loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
@@ -102,8 +103,19 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
             # 'wgan-lp'
             loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
                 torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()
-
-        loss_d.backward()
+        
+        """不能用loss_d.backward()
+        因為這裡有一個很怪的地方在上面算loss_d時，+ lamb * ((gradient_norm - 1).pow(2))這一項會讓
+        下一輪在call score_sample = net_d(so3_sample, text_match, text_match_mask)時裡面的
+        LayerNorm返回NaN
+        解法如下:
+        """
+        score_right = score_right.mean()
+        score_wrong = score_wrong.mean()
+        score_fake = score_fake.mean()
+        score_right.backward()
+        score_wrong.backward()
+        score_fake.backward()
         optimizer_d.step_and_update_lr()
         
     return loss_d
@@ -125,7 +137,7 @@ def update_generator(cfg, device, net_g, net_d, optimizer_g, criterion, batch):
     so3_fake = net_g(noise1, text_match, text_match_mask)
     so3_interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
 
-    # discriminate heatmpap-text pairs
+    # discriminate so3-text pairs
     score_fake = net_d(so3_fake, text_match, text_match_mask)
     score_interpolated = net_d(so3_interpolated, text_interpolated, text_interpolated_mask)
 
@@ -152,9 +164,8 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
     total_loss_d = 0
     for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=True)):        
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-        loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)        
+        loss_d = update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch)         
         total_loss_d += loss_d.item()
-        
         """# log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
         # after training discriminator for N times, train gernerator for 1 time
@@ -197,15 +208,15 @@ def get_d_loss(cfg, device, net_g, net_d, criterion, batch):
     else:
         # 'wgan-gp' and 'wgan-lp'
         epsilon_val = np.random.rand(cfg.BATCH_SIZE)
-        heatmap_sample_val = torch.empty_like(so3_real)
+        so3_sample = torch.empty_like(so3_real)
         for j in range(cfg.BATCH_SIZE):
-            heatmap_sample_val[j] = epsilon_val[j] * so3_real[j] + (1 - epsilon_val[j]) * so3_fake[j]
-        heatmap_sample_val.requires_grad = True
+            so3_sample[j] = epsilon_val[j] * so3_real[j] + (1 - epsilon_val[j]) * so3_fake[j]
+        so3_sample.requires_grad = True
         text_match.requires_grad = True
-        score_sample_val = net_d(heatmap_sample_val, text_match)
-        gradient_h_val, gradient_t_val = grad(score_sample_val, [heatmap_sample_val, text_match],
+        score_sample_val = net_d(so3_sample, text_match, text_match_mask)
+        gradient_h_val, gradient_t_val = grad(score_sample_val, [so3_sample, text_match],
                                             torch.ones_like(score_sample_val), create_graph=True)
-        gradient_norm_val = (gradient_h_val.pow(2).sum((1, 2, 3)) + gradient_t_val.pow(2).sum((1, 2, 3))).sqrt()
+        gradient_norm_val = (gradient_h_val.pow(2).sum((1, 2)) + gradient_t_val.pow(2).sum((1, 2))).sqrt()
         if algorithm == 'wgan-gp':
             loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
                 (gradient_norm_val - 1).pow(2))).mean()
@@ -303,6 +314,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         # Train!!
         start = time.time()
         train_loss_g, train_loss_d = train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train)
+        
         lr_g=optimizer_g._optimizer.param_groups[0].get('lr')
         lr_d=optimizer_d._optimizer.param_groups[0].get('lr')
         print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d, e)
@@ -313,8 +325,8 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
-
-        save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
+        if e % 5 == 4:
+            save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
         print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes")
 
@@ -337,8 +349,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    print(5%6)
-    print(12%6)
-    print(7%6)
-    from config import cfg
-    print(cfg)
+    #real_data.nelement()
+    alpha = torch.rand(5, 1)
+    alpha = alpha.expand(5, (5*24*3*3)//5).contiguous().view(5, 24, 3, 3)
+    print(alpha.size())
