@@ -9,6 +9,8 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter 
 from utils import get_noise_tensor
 
+from torch.autograd import Variable
+
 
 # algorithms: gan, wgan, wgan-gp, wgan-lp
 # gan: k = 1, beta_1 = 0.5, beta_2 = 0.999, lr = 0.0001, epoch = 50~300
@@ -28,6 +30,54 @@ lamb = 10
 # level of text-image matching
 alpha = 1
 
+def get_penalty(batch_size, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask):  
+    epsilon = torch.rand(batch_size, dtype=torch.float32)  
+    ##########################
+    # get so3_interpolated
+    ##########################
+    so3_interpolated = torch.empty_like(so3_real, dtype=torch.float32)   
+    for j in range(batch_size):
+        so3_interpolated[j] = epsilon[j] * so3_real[j] + (1 - epsilon[j]) * so3_fake[j]
+    """# random sample
+    epsilon = torch.rand(batch_size, 1, dtype=torch.float32)
+    epsilon = epsilon.expand(batch_size, so3_real.nelement()//batch_size).contiguous().view(batch_size, so3_real.size()[-2], so3_real.size()[-1])
+    
+    # get so3_interpolated
+    so3_interpolated  = epsilon * so3_real + ((1 - epsilon) * so3_fake)"""
+    so3_interpolated = Variable(so3_interpolated, requires_grad=True)    
+    # calculate gradient penalty
+    score_interpolated_s = net_d(so3_interpolated, text_match, text_match_mask)
+    gradient_so3 = grad(outputs=score_interpolated_s, 
+                    inputs=so3_interpolated, 
+                    grad_outputs=torch.ones_like(score_interpolated_s),
+                    create_graph=True, 
+                    retain_graph=True)[0]
+    """TODO 首先不確定把so3和text各跑一次net_d算梯度是否合理 再來不確定這裡算norm時dim=1正不正確"""
+
+    grad_penalty_s = ((gradient_so3.norm(2, dim=1) - 1) ** 2).mean() * lamb
+    ##########################
+    # get text_interpolated
+    ##########################
+    text_interpolated = torch.empty_like(text_match, dtype=torch.float32)   
+    for j in range(batch_size):
+        text_interpolated[j] = epsilon[j] * text_match[j] + (1 - epsilon[j]) * text_mismatch[j]    
+    
+    """text_interpolated = epsilon * text_match + ((1 - epsilon) * text_mismatch)"""
+    text_interpolated = Variable(text_interpolated, requires_grad=True)
+
+    f_mask = lambda x,y: torch.tensor([1 if x[i] or y[i] else 0 for i in range(len(x))])
+    text_interpolated_mask = torch.empty_like(text_match_mask)
+    for i in range(batch_size):
+        text_interpolated_mask[i] = f_mask(text_match_mask[0], text_mismatch_mask[0])
+
+    score_interpolated_t = net_d(so3_real, text_interpolated, text_interpolated_mask)
+    gradient_text = grad(outputs=score_interpolated_t, 
+                    inputs=text_interpolated, 
+                    grad_outputs=torch.ones_like(score_interpolated_t),
+                    create_graph=True, 
+                    retain_graph=True)[0] 
+    grad_penalty_t = ((gradient_text.norm(2, dim=1) - 1) ** 2).mean() * lamb
+    return grad_penalty_s, grad_penalty_t
 
 def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batch):
     net_d.train()
@@ -78,44 +128,17 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
         for p in net_d.parameters():
             p.data.clamp_(-c, c)
     else:
-        # 'wgan-gp' and 'wgan-lp'
-        # random sample
-        """epsilon = torch.rand(cfg.BATCH_SIZE, 1, dtype=torch.float32)
-        epsilon = epsilon.expand(cfg.BATCH_SIZE, so3_real.nelement()//cfg.BATCH_SIZE).contiguous().view(cfg.BATCH_SIZE, so3_real.size()[-2], so3_real.size()[-1])"""
-        epsilon = torch.rand(cfg.BATCH_SIZE, dtype=torch.float32)
-        so3_sample = torch.empty_like(so3_real, dtype=torch.float32)
-        """so3_sample = epsilon * so3_real + ((1 - epsilon) * so3_fake)"""
-        for j in range(cfg.BATCH_SIZE):
-            so3_sample[j] = epsilon[j] * so3_real[j] + (1 - epsilon[j]) * so3_fake[j]
-        
-        so3_sample.requires_grad = True
-        text_match.requires_grad = True
-        # calculate gradient penalty
-        score_sample = net_d(so3_sample, text_match, text_match_mask)
-        gradient_h, gradient_t = grad(score_sample, [so3_sample, text_match], torch.ones_like(score_sample),
-                                        create_graph=True)
-        gradient_norm = (gradient_h.pow(2).sum((1, 2)) + gradient_t.pow(2).sum((1, 2))).sqrt()
+        # 'wgan-gp' and 'wgan-lp'        
         # calculate losses and update
         if algorithm == 'wgan-gp':
-            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
-                (gradient_norm - 1).pow(2))).mean()
-        else:
+            penalty_s, penalty_t = get_penalty(cfg.BATCH_SIZE, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask)
+            loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + penalty_s + penalty_t).mean()
+        """else:
             # 'wgan-lp'
             loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
-                torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()
+                torch.max(torch.tensor(0, dtype=torch.float32, device=device), gradient_norm - 1).pow(2))).mean()"""
         
-        """不能用loss_d.backward()
-        因為這裡有一個很怪的地方在上面算loss_d時，+ lamb * ((gradient_norm - 1).pow(2))這一項會讓
-        下一輪在call score_sample = net_d(so3_sample, text_match, text_match_mask)時裡面的
-        LayerNorm返回NaN
-        解法如下:
-        """
-        score_right = score_right.mean()
-        score_wrong = score_wrong.mean()
-        score_fake = score_fake.mean()
-        score_right.backward()
-        score_wrong.backward()
-        score_fake.backward()
+        loss_d.backward()
         optimizer_d.step_and_update_lr()
         
     return loss_d
@@ -349,7 +372,12 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    #real_data.nelement()
-    alpha = torch.rand(5, 1)
-    alpha = alpha.expand(5, (5*24*3*3)//5).contiguous().view(5, 24, 3, 3)
-    print(alpha.size())
+    a = torch.tensor([0.2308, 0.2388], requires_grad=True)
+    b = torch.tensor([0.6314, 0.7867], requires_grad=True)
+
+   
+
+    
+    print(a*3)
+    
+    
