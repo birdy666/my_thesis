@@ -341,12 +341,12 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         elapse_mid=(time.time()-start_of_all_training)/60
         print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes")
 
-        # Write log
+        """# Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:
             log_tf.write('{epoch},{loss_g: 8.5f},{loss_d: 8.5f}\n'.format(
                 epoch=e, loss_g=train_loss_g, loss_d=train_loss_d))
             log_vf.write('{epoch},{loss_g: 8.5f},{loss_d: 8.5f}\n'.format(
-                epoch=e, loss_g=val_loss_g, loss_d=val_loss_d))
+                epoch=e, loss_g=val_loss_g, loss_d=val_loss_d))"""
 
         if cfg.USE_TENSORBOARD:
             """tb_writer.add_scalars('loss_g', {'train': train_loss_g, 'val': val_loss_g}, e)
