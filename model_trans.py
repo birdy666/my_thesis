@@ -69,10 +69,10 @@ class Discriminator(nn.Module):
         self.cfg = cfg
         self.position_enc = PositionalEncoding(cfg.D_WORD_VEC, n_position=cfg.N_POSITION_D)
         self.dropout = nn.Dropout(p=cfg.DROPOUT_D)
-        self.layer_norm = nn.LayerNorm(cfg.SENTENCE_VECTOR_SIZE, eps=1e-6)
-        self.encoder_text = EncoderLayer(d_model=cfg.SENTENCE_VECTOR_SIZE, 
-                                        d_inner=cfg.SENTENCE_VECTOR_SIZE * cfg.D_INNER_SCALE_D, 
-                                        d_out =cfg.SENTENCE_VECTOR_SIZE//2,
+        self.layer_norm = nn.LayerNorm(cfg.D_WORD_VEC, eps=1e-6)
+        self.encoder_text = EncoderLayer(d_model=cfg.D_WORD_VEC, 
+                                        d_inner=cfg.D_WORD_VEC * cfg.D_INNER_SCALE_D, 
+                                        d_out =cfg.D_WORD_VEC//2,
                                         n_head=8, 
                                         d_k=64, 
                                         d_v=64, 
@@ -104,19 +104,22 @@ class Discriminator(nn.Module):
         else:
             input_vec = text_vec
         input_vec = self.dropout(self.position_enc(input_vec))
-        # 128 x 24 x 300
-        input_vec  = self.layer_norm(input_vec)
         # 128 x 24 x 150
-        enc_output, _ = self.encoder_text(input_vec, src_mask.unsqueeze(-2))
+        input_vec  = self.layer_norm(input_vec)
+        """# 128 x 24 x 150 直接用fasttext中的降為降成150
+        enc_output, _ = self.encoder_text(input_vec, src_mask.unsqueeze(-2))"""
         # 128 x 24 x 300
         """TODO 這裡50是寫死的"""
-        enc_output = torch.cat((enc_output, so3.repeat(1,1,50)), -1)
-        for enc_layer in self.encoder_stack:
+        enc_output = torch.cat((input_vec, so3.repeat(1,1,50)), -1)
+        for i, enc_layer in enumerate(self.encoder_stack):
             """
             enc_output: (batch, text_len, word_emb_len)
             src_mask: (batch, text_len) ==> unsqueeze(-2) ==> (batch, 1, text_len)
             """
-            enc_output , _ = enc_layer(enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
+            if i == 0:
+                enc_output , _ = enc_layer(enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
+            else:
+                enc_output , _ = enc_layer(enc_output , slf_attn_mask=None)
         
         
         """
@@ -130,7 +133,4 @@ class Discriminator(nn.Module):
 
 
 if __name__ == "__main__":
-    a = torch.tensor([[[1,1],[2,2]]
-                    ])
-    print(a.size())
-    print(a.repeat(1,1,2))
+    import fasttext.util

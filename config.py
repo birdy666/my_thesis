@@ -35,7 +35,6 @@ __C.EFT_FIT_WITH_CAPTION_PATH = my_dir + '/eft/eft_fit/COCO2014-All-ver01_with_c
 # text model
 __C.TEXT_MODEL_PATH = my_dir + '/fastText/wiki.en.bin'
 __C.ENCODING_WEIGHT = 30
-__C.SENTENCE_VECTOR_SIZE = 300
 
 # smpl
 __C.SMPL_MODEL_PATH = my_dir + "/datasets/smpl/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
@@ -45,13 +44,13 @@ __C.N_train_D_1_train_G = 10 # train discriminator k times before training gener
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 0.00001
 __C.LEARNING_RATE_D = 0.00001
-__C.NOISE_SIZE = 300
+__C.NOISE_SIZE = 150
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
 __C.JOINT_NUM = 24
 __C.MAX_SENTENCE_LEN = __C.JOINT_NUM
 
-__C.D_WORD_VEC = 300
+__C.D_WORD_VEC = 150
 
 __C.SCORE_RIGHT_WEIGHT_D = 2
 __C.SCORE_WRONG_WEIGHT_D = 1
@@ -60,10 +59,10 @@ __C.PENALTY_WEIGHT_WRONG = 10
 __C.PENALTY_WEIGHT_FAKE = 10
 
 # Model g
-__C.D_MODEL_LIST_G = [600,256,128,64,32,16,8,3] 
+__C.D_MODEL_LIST_G = [300,128,64,32,16,8,3] 
 __C.N_LAYERS_G = len(__C.D_MODEL_LIST_G)-1
-__C.N_HEAD_LIST_G = [8,8,8,4,4,4,4]
-__C.D_K_LIST_G = [128,64,32,16,8,4,4] 
+__C.N_HEAD_LIST_G = [8,8,4,4,4,4]
+__C.D_K_LIST_G = [64,32,16,8,4,4] 
 __C.D_V_LIST_G = __C.D_K_LIST_G
 __C.DROPOUT_G = 0.1
 __C.N_POSITION_G = 200
