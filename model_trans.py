@@ -69,7 +69,14 @@ class Discriminator(nn.Module):
         self.cfg = cfg
         self.position_enc = PositionalEncoding(cfg.D_WORD_VEC, n_position=cfg.N_POSITION_D)
         self.dropout = nn.Dropout(p=cfg.DROPOUT_D)
-        self.layer_norm = nn.LayerNorm(cfg.D_MODEL_LIST_D[0], eps=1e-6)
+        self.layer_norm = nn.LayerNorm(cfg.SENTENCE_VECTOR_SIZE, eps=1e-6)
+        self.encoder_text = EncoderLayer(d_model=cfg.SENTENCE_VECTOR_SIZE, 
+                                        d_inner=cfg.SENTENCE_VECTOR_SIZE * cfg.D_INNER_SCALE_D, 
+                                        d_out =cfg.SENTENCE_VECTOR_SIZE//2,
+                                        n_head=8, 
+                                        d_k=64, 
+                                        d_v=64, 
+                                        dropout=cfg.DROPOUT_D)
         self.encoder_stack = nn.ModuleList([
                                             EncoderLayer(d_model=cfg.D_MODEL_LIST_D[i], 
                                                         d_inner=cfg.D_MODEL_LIST_D[i] * cfg.D_INNER_SCALE_D, 
@@ -79,25 +86,31 @@ class Discriminator(nn.Module):
                                                         d_v=cfg.D_V_LIST_D[i], 
                                                         dropout=cfg.DROPOUT_D)
                                                         for i in range(cfg.N_LAYERS_D)])
-        self.encoder_last = EncoderLayer(d_model=6, 
+        """self.encoder_last = EncoderLayer(d_model=6, 
                                         d_inner=24, 
                                         d_out =1,
                                         n_head=2, 
                                         d_k=3, 
                                         d_v=3, 
-                                        dropout=cfg.DROPOUT_D)
+                                        dropout=cfg.DROPOUT_D)"""
 
         self.fc = nn.Linear(24, 1, bias=False)
 
     def forward(self, so3, text_vec, src_mask):
         # -- Forward
-        input_vec = text_vec.clone()
         """這裡應該不用每一層都做， 圖片上的normalize還有dropout在PositionwiseFeedForward"""
         if self.cfg.SCALE_EMB_D:
-            input_vec *= self.cfg.D_MODEL_LIST_D[0] ** 0.5
+            input_vec = text_vec * self.cfg.D_MODEL_LIST_D[0] ** 0.5
+        else:
+            input_vec = text_vec
         input_vec = self.dropout(self.position_enc(input_vec))
-        enc_output  = self.layer_norm(input_vec)
-
+        # 128 x 24 x 300
+        input_vec  = self.layer_norm(input_vec)
+        # 128 x 24 x 150
+        enc_output, _ = self.encoder_text(input_vec, src_mask.unsqueeze(-2))
+        # 128 x 24 x 300
+        """TODO 這裡50是寫死的"""
+        enc_output = torch.cat((enc_output, so3.repeat(1,1,50)), -1)
         for enc_layer in self.encoder_stack:
             """
             enc_output: (batch, text_len, word_emb_len)
@@ -105,16 +118,19 @@ class Discriminator(nn.Module):
             """
             enc_output , _ = enc_layer(enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
         
+        
+        """
         # (128, 24, 3+3)
         so3_enc_output = torch.cat((so3, enc_output), -1)
-        output, _ =  self.encoder_last(so3_enc_output, slf_attn_mask=None)
-        output = self.fc(output.view(-1, self.cfg.JOINT_NUM))
+        output, _ =  self.encoder_last(so3_enc_output, slf_attn_mask=None)"""
+        # 128 x 24 x 1
+        output = self.fc(enc_output.view(-1, self.cfg.JOINT_NUM))
         #output = F.sigmoid(output)
         return output
 
 
 if __name__ == "__main__":
-    a = [1,2,3,4,5]
-    for i in range(4, 0-1, -1):
-        #print(i)
-        print(a[i])
+    a = torch.tensor([[[1,1],[2,2]]
+                    ])
+    print(a.size())
+    print(a.repeat(1,1,2))

@@ -53,6 +53,12 @@ __C.MAX_SENTENCE_LEN = __C.JOINT_NUM
 
 __C.D_WORD_VEC = 300
 
+__C.SCORE_RIGHT_WEIGHT_D = 2
+__C.SCORE_WRONG_WEIGHT_D = 1
+__C.SCORE_FAKE_WEIGHT_D = 1
+__C.PENALTY_WEIGHT_WRONG = 10
+__C.PENALTY_WEIGHT_FAKE = 10
+
 # Model g
 __C.D_MODEL_LIST_G = [600,256,128,64,32,16,8,3] 
 __C.N_LAYERS_G = len(__C.D_MODEL_LIST_G)-1
@@ -66,7 +72,7 @@ __C.D_INNER_SCALE_G = 2
 
 
 # Model d
-__C.D_MODEL_LIST_D = [300,128,64,32,16,8,3] 
+__C.D_MODEL_LIST_D = [300,128,64,32,16,8,1] 
 __C.N_LAYERS_D = len(__C.D_MODEL_LIST_D)-1
 __C.N_HEAD_LIST_D = [8,8,4,4,4,4,2]
 __C.D_K_LIST_D = [64,32,16,8,4,4] 
@@ -75,6 +81,7 @@ __C.DROPOUT_D = 0.1
 __C.N_POSITION_D = 200
 __C.SCALE_EMB_D = False
 __C.D_INNER_SCALE_D = 2
+__C.FAKE_WRONG_DIFF_WEIGHT = 1
 
 # OPtimizer
 # ADAM solver
@@ -122,7 +129,6 @@ def _merge_a_into_b(a, b):
                 raise
         else:
             b[k] = v
-
 
 def cfg_from_file(filename):
     """Load a config file and merge it into the default options."""

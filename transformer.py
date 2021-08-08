@@ -184,6 +184,7 @@ class EncoderLayer(nn.Module):
         enc_output: (batch, text_len, d_model) ==> (batch, text_len, d_out)
         """
         enc_output = self.fc(enc_output)
+        """TODO 不知道為啥這一行會讓gp算出來都是0"""
         #enc_output = self.layer_norm(enc_output)
         return enc_output, enc_slf_attn
 
