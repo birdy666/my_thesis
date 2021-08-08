@@ -126,7 +126,7 @@ def update_discriminator(cfg, device, net_g, net_d, optimizer_d, criterion, batc
         loss_d = cfg.SCORE_FAKE_WEIGHT_D * score_fake + cfg.SCORE_WRONG_WEIGHT_D * score_wrong \
                 - cfg.SCORE_RIGHT_WEIGHT_D * score_right \
                 +cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake + cfg.PENALTY_WEIGHT_WRONG * grad_penalty_wrong \
-                + cfg.FAKE_WRONG_DIFF_WEIGHT * ((score_fake-score_wrong)**2)
+                + cfg.FAKE_WRONG_DIFF_WEIGHT * (((score_fake-score_wrong)**2)**0.5)
         loss_d.backward()
         optimizer_d.step_and_update_lr()
     """else:
