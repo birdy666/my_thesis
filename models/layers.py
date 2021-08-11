@@ -84,7 +84,7 @@ class MultiHeadAttention(nn.Module):
 
         d_k, d_v, n_head = self.d_k, self.d_v, self.n_head
         # q,k,v: (batch, text_len, d_model) 
-        sz_b, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
+        batch_size, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
 
         residual = q
 
@@ -94,9 +94,9 @@ class MultiHeadAttention(nn.Module):
         q, k, v: (batch, text_len, d_model) ==> w_qs ==> (batch, text_len, head*d_k ) 
                     ==> view ==> (batch, text_len, head, d_k)
         """
-        q = self.w_qs(q).view(sz_b, len_q, n_head, d_k)
-        k = self.w_ks(k).view(sz_b, len_k, n_head, d_k)
-        v = self.w_vs(v).view(sz_b, len_v, n_head, d_v)
+        q = self.w_qs(q).view(batch_size, len_q, n_head, d_k)
+        k = self.w_ks(k).view(batch_size, len_k, n_head, d_k)
+        v = self.w_vs(v).view(batch_size, len_v, n_head, d_v)
 
         # Transpose 變(batch, head, text_len, d_k) 這是attention要求的形狀
         """
@@ -120,7 +120,7 @@ class MultiHeadAttention(nn.Module):
         """
         q: (batch, head, text_len , d_k) ==> (batch, text_len, head*d_k)
         """
-        q = q.transpose(1, 2).contiguous().view(sz_b, len_q, -1)
+        q = q.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
         """
         q: (batch, text_len, head*d_k) ==> (batch, text_len, d_model)
         """
@@ -155,6 +155,30 @@ class PositionwiseFeedForward(nn.Module):
 
         return x
 
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model, max_len=200):
+        super(PositionalEncoding, self).__init__()
+
+        # Not a parameter
+        self.register_buffer('pos_table', self._get_sinusoid_encoding_table(max_len, d_model))
+
+    def _get_sinusoid_encoding_table(self, max_len, d_model):
+        ''' Sinusoid position encoding table '''
+        # TODO: make it with torch instead of numpy
+
+        def get_position_angle_vec(position):
+            return [position / np.power(10000, 2 * (hid_j // 2) / d_model) for hid_j in range(d_model)]
+
+        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(max_len)])
+        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
+        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+
+        return torch.FloatTensor(sinusoid_table).unsqueeze(0)
+
+    def forward(self, x):
+        return x + self.pos_table[:, :x.size(1)].clone().detach()
+
 class EncoderLayer(nn.Module):
     ''' Compose with two layers '''
     def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1):
@@ -172,34 +196,24 @@ class EncoderLayer(nn.Module):
         enc_output: (batch, text_len, d_model)
         enc_slf_attn: (batch, head, text_len, text_len)
         """
-        enc_output, enc_slf_attn = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
+        enc_output, _ = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
         enc_output = self.pos_ffn(enc_output)
-        return enc_output, enc_slf_attn
+        return enc_output
 
-class PositionalEncoding(nn.Module):
+class DecoderLayer(nn.Module):
+    ''' Compose with two layers '''
+    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1):
+        super(DecoderLayer, self).__init__()
+        self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
+        self.enc_dec_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
+        self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout)
 
-    def __init__(self, d_hid, n_position=200):
-        super(PositionalEncoding, self).__init__()
+    def forward(self, dec_input, enc_output, slf_attn_mask=None, dec_enc_attn_mask=None):        
+        dec_output, _ = self.slf_attn(dec_input, dec_input, dec_input, mask=slf_attn_mask)
+        enc_dec_output, _ = self.enc_dec_attn(dec_output, enc_output, enc_output, mask=dec_enc_attn_mask)
+        enc_dec_output = self.pos_ffn(enc_dec_output)
 
-        # Not a parameter
-        self.register_buffer('pos_table', self._get_sinusoid_encoding_table(n_position, d_hid))
-
-    def _get_sinusoid_encoding_table(self, n_position, d_hid):
-        ''' Sinusoid position encoding table '''
-        # TODO: make it with torch instead of numpy
-
-        def get_position_angle_vec(position):
-            return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
-
-        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
-        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
-        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
-
-        return torch.FloatTensor(sinusoid_table).unsqueeze(0)
-
-    def forward(self, x):
-        return x + self.pos_table[:, :x.size(1)].clone().detach()
-
+        return enc_output
 
 if __name__ == "__main__":
     x = torch.randn(1, 20, 30)  # 输入的维度是（128，20）

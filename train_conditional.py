@@ -183,11 +183,11 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
                 - cfg.SCORE_RIGHT_WEIGHT_D * score_right \
                 +cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake + cfg.PENALTY_WEIGHT_WRONG * grad_penalty_wrong
         total_loss_d += loss_d.item()
-        """# log
-        writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
-        if tb_writer != None:
-            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong': grad_penalty_wrong}, e*149+i)
         
+        if tb_writer != None:
+            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong': grad_penalty_wrong}, e*149+i)"""
+        """# log
+        writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)
         ###############################################################
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
@@ -220,8 +220,7 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
         # calculate d loss
         score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, update_d=False)
         loss_d = cfg.SCORE_FAKE_WEIGHT_D * score_fake + cfg.SCORE_WRONG_WEIGHT_D * score_wrong \
-                - cfg.SCORE_RIGHT_WEIGHT_D * score_right \
-                +cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake + cfg.PENALTY_WEIGHT_WRONG * grad_penalty_wrong
+                - cfg.SCORE_RIGHT_WEIGHT_D * score_right 
         total_loss_d += loss_d.item()
 
         # calculate g loss

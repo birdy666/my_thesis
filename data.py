@@ -61,7 +61,7 @@ def getData(cfg):
     #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
     # load text encoding model
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)  
-    fasttext.util.reduce_model(text_model, 150)  
+    fasttext.util.reduce_model(text_model, 150)
     eft_all_with_caption = getEFTCaption(cfg, coco_caption)    
     print("create dataloaders")
     # get the dataset (single person, with captions)

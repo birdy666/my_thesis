@@ -7,8 +7,7 @@ from optim import ScheduledOptim
 from config import cfg
 from train_conditional import train
 from data import getData
-from model_trans import getModels
-from utils import get_noise_tensor
+from models.model_gan import getModels
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
