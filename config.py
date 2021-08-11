@@ -16,7 +16,7 @@ __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
 __C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 300#1200
+__C.END_IN_EPOCH = 1200#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 
 # coco
@@ -84,8 +84,8 @@ __C.FAKE_WRONG_DIFF_WEIGHT = 1
 
 # OPtimizer
 # ADAM solver
-__C.BETA_1 = 0.9
-__C.BETA_2 = 0.98
+__C.BETA_1 = 0.5
+__C.BETA_2 = 0.999
 __C.N_WARMUP_STEPS_G = 2000
 __C.N_WARMUP_STEPS_D = 3000
 
