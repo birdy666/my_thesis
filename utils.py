@@ -36,5 +36,25 @@ def get_noise_tensor(batch_size,  noise_size):
     noise_tensor = torch.randn((batch_size, 24, noise_size), dtype=torch.float32)
     return noise_tensor
 
+def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
+    print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
+            'elapse: {elapse:3.3f} min'.format(
+                e = e, header=f"({header})", loss_g=loss_g,
+                loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
+
+def save_models(cfg, e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
+    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(),
+                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d, 'cfg':cfg}
+
+    if save_mode == 'all':
+        torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")
+    elif save_mode == 'best':
+        pass
+        """model_name = 'model.chkpt'
+        if valid_loss <= min(valid_losses):
+            torch.save(checkpoint, os.path.join(opt.output_dir, model_name))
+            print('    - [Info] The checkpoint file has been updated.')"""
+
+
 if __name__ == "__main__":
     print(random.choice(list(range(2))))

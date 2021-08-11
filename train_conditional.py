@@ -7,7 +7,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter 
-from utils import get_noise_tensor
+from utils import get_noise_tensor, print_performances, save_models
 
 from torch.autograd import Variable
 
@@ -111,16 +111,20 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
             for p in net_d.parameters():
                 p.data.clamp_(-c, c)
     elif algorithm == 'wgan-gp':
-        grad_penalty_fake, grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask)
-        grad_penalty_fake = grad_penalty_fake.mean()
-        grad_penalty_wrong = grad_penalty_wrong.mean()
         if update_d:
+            grad_penalty_fake, grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask)
+            grad_penalty_fake = grad_penalty_fake.mean()
+            grad_penalty_wrong = grad_penalty_wrong.mean()
+        
             loss_d = cfg.SCORE_FAKE_WEIGHT_D * score_fake + cfg.SCORE_WRONG_WEIGHT_D * score_wrong \
                     - cfg.SCORE_RIGHT_WEIGHT_D * score_right \
                     +cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake + cfg.PENALTY_WEIGHT_WRONG * grad_penalty_wrong
                     #+ cfg.FAKE_WRONG_DIFF_WEIGHT * (((score_fake-score_wrong)**2)**0.5)
             loss_d.backward()
             optimizer_d.step_and_update_lr()
+        else:
+            grad_penalty_fake = 0
+            grad_penalty_wrong = 0
     """else:
         # 'wgan-lp'
         loss_d = (score_fake + alpha * score_wrong - (1 + alpha) * score_right + lamb * (
@@ -226,25 +230,6 @@ def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
         total_loss_g += loss_g.item()
     return total_loss_g, total_loss_d   
 
-def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
-    print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
-            'elapse: {elapse:3.3f} min'.format(
-                e = e, header=f"({header})", loss_g=loss_g,
-                loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
-
-def save_models(cfg, e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
-    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(),
-                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d, 'cfg':cfg}
-
-    if save_mode == 'all':
-        torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")
-    elif save_mode == 'best':
-        pass
-        """model_name = 'model.chkpt'
-        if valid_loss <= min(valid_losses):
-            torch.save(checkpoint, os.path.join(opt.output_dir, model_name))
-            print('    - [Info] The checkpoint file has been updated.')"""
-
 def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val):   
     # tensorboard
     if cfg.USE_TENSORBOARD:
@@ -274,6 +259,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
+        # save model for each 5 epochs
         if e % 5 == 4:
             save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
