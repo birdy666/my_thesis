@@ -53,7 +53,6 @@ class ScaledDotProductAttention(nn.Module):
 
 class MultiHeadAttention(nn.Module):
     ''' Multi-Head Attention module '''
-    # 0727 新增_d_out
     def __init__(self, n_head, d_model, d_k, d_v, dropout=0.1):
         super().__init__()
         self.n_head = n_head
@@ -158,15 +157,10 @@ class PositionwiseFeedForward(nn.Module):
 
 class EncoderLayer(nn.Module):
     ''' Compose with two layers '''
-    def __init__(self, d_model, d_inner, d_out, n_head, d_k, d_v, dropout=0.1):
+    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1):
         super(EncoderLayer, self).__init__()
         self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
         self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout)
-        # 7/22新增 因為原版的輸入輸出一樣維度 這裡做降維
-        # 參考 MultiHeadAttention forward中fc的註解
-        self.fc = nn.Linear(d_model, d_out, bias=False)
-        self.layer_norm = nn.LayerNorm(d_out, eps=1e-6)
-
     def forward(self, enc_input, slf_attn_mask=None):
         # 這裡的output是多頭產生的結果，並黏在一起
         """
@@ -180,12 +174,6 @@ class EncoderLayer(nn.Module):
         """
         enc_output, enc_slf_attn = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
         enc_output = self.pos_ffn(enc_output)
-        """
-        enc_output: (batch, text_len, d_model) ==> (batch, text_len, d_out)
-        """
-        enc_output = self.fc(enc_output)
-        """TODO 不知道為啥這一行會讓gp算出來都是0"""
-        #enc_output = self.layer_norm(enc_output)
         return enc_output, enc_slf_attn
 
 class PositionalEncoding(nn.Module):
@@ -214,7 +202,11 @@ class PositionalEncoding(nn.Module):
 
 
 if __name__ == "__main__":
-    print(os.path.isfile('renderer/glRenderer.py'))
-    current_dir = os.path.dirname(__file__)
-    print(current_dir)
-    print(os.path.dirname(current_dir))
+    x = torch.randn(1, 20, 30)  # 输入的维度是（128，20）
+
+    m = torch.nn.Linear(30, 15)  # 20,30是指维度
+
+    output = m(x)
+
+
+    print('output.shape:\n', output.shape)
