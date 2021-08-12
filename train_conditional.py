@@ -262,7 +262,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         if e % 5 == 4:
             save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
-        print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes")
+        print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes (" + str(elapse_mid/60) + " hours)")
 
         """# Write log
         with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:

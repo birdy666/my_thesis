@@ -3,6 +3,7 @@ import torch
 from math import sin, cos, pi
 import random
 import string
+import time
 
 def get_input_mask(vectors, max_sentence_len):
     mask = []

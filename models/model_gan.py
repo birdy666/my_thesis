@@ -43,16 +43,17 @@ class Discriminator(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.position_enc = PositionalEncoding(150)
+        self.position_enc = PositionalEncoding(cfg.D_WORD_VEC)
         self.dropout = nn.Dropout(p=cfg.DROPOUT_D)
         self.layer_norm = nn.LayerNorm(cfg.D_WORD_VEC, eps=1e-6)
-        self.encoder_stack = nn.ModuleList([EncoderLayer(d_model=150, 
-                                                        d_inner=4 * 150, 
-                                                        n_head=8, 
-                                                        d_k=32, 
-                                                        d_v=32, 
+        self.encoder_stack = nn.ModuleList([EncoderLayer(d_model=cfg.D_MODEL_LIST_D[i], 
+                                                        d_inner=cfg.D_MODEL_LIST_D[i] * cfg.D_INNER_SCALE_D, 
+                                                        n_head=cfg.N_HEAD_LIST_D[i], 
+                                                        d_k=cfg.D_K_LIST_D[i], 
+                                                        d_v=cfg.D_V_LIST_D[i], 
                                                         dropout=cfg.DROPOUT_D)
-                                                        for _ in range(6)])
+                                                        for i in range(cfg.N_LAYERS_D)])  
+        self.fc_stack = nn.ModuleList([nn.Linear(cfg.D_MODEL_LIST_D[i], cfg.D_MODEL_LIST_D[i+1], bias=False) for i in range(cfg.N_LAYERS_D)])  
         self.fc = nn.Linear(24, 1, bias=False)
 
     def forward(self, so3, text_vec, src_mask):
@@ -75,7 +76,7 @@ class Discriminator(nn.Module):
             enc_output: (batch, text_len, word_emb_len)
             src_mask: (batch, text_len) ==> unsqueeze(-2) ==> (batch, 1, text_len)
             """
-            enc_output , _ = self.encoder_stack[i](enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
+            enc_output = self.encoder_stack[i](enc_output , slf_attn_mask=src_mask.unsqueeze(-2))
             enc_output = self.fc_stack[i](enc_output)
         """
         # (128, 24, 3+3)
