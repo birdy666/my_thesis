@@ -213,7 +213,7 @@ class DecoderLayer(nn.Module):
         enc_dec_output, _ = self.enc_dec_attn(dec_output, enc_output, enc_output, mask=dec_enc_attn_mask)
         enc_dec_output = self.pos_ffn(enc_dec_output)
 
-        return enc_output
+        return enc_dec_output
 
 if __name__ == "__main__":
     x = torch.randn(1, 20, 30)  # 输入的维度是（128，20）

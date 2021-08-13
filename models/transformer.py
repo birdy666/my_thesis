@@ -62,8 +62,7 @@ class Decoder(nn.Module):
         #if self.cfg.SCALE_EMB_G:
         #    input_vec *= self.cfg.D_MODEL_LIST_G[0] ** 0.5
         #input_vec = self.dropout(self.position_enc(input_vec))
-        input_vec = self.dropout(dec_input)
-        enc_output  = self.layer_norm(input_vec)
+        dec_input  = self.layer_norm(self.dropout(dec_input))
 
         for dec_layer in self.decoder_stack:
             """
