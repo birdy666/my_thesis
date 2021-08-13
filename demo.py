@@ -1,24 +1,26 @@
 import json
 import copy
 import torch
-from model_trans import Generator
+from models.model_gan import Generator
 from config import cfg
 from utils import get_noise_tensor, get_caption_vector
 import string
 from pycocotools.coco import COCO
 import fasttext
+import fasttext.util
 from geometry import so32rotation, rotation2so3
 import numpy as np
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints_02' + "/epoch_135"  + ".chkpt")
+    checkpoint = torch.load('./models/epoch_254' + ".chkpt")
     net_g = Generator(cfg).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
+    fasttext.util.reduce_model(text_model, 150)
     
     with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
         eft_all_with_caption = json.load(f)
@@ -39,7 +41,7 @@ if __name__ == "__main__":
     
         text_match = torch.tensor(data['vector'], dtype=torch.float32).unsqueeze(0)
         text_match_mask = torch.tensor(data['vec_mask'], dtype=torch.int).unsqueeze(0)
-        noise = torch.randn((1, 24, 300), dtype=torch.float32).to(device)
+        noise = torch.randn((1, 24, 150), dtype=torch.float32).to(device)
         
         so3_fake = net_g(noise, text_match, text_match_mask)
         
