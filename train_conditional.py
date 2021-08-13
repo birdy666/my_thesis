@@ -22,7 +22,19 @@ algorithm = 'wgan-gp'
 # weight clipping (WGAN)
 c = 0.01
 
-def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask):  
+def get_sentence_vec(batch_size, text_vec, mask):
+    # get sentence vector (128x1x150)
+    text_vec = text_vec.sum(dim=1).unsqueeze(1)
+    # get average
+    sentence_len = mask.sum(1)
+    sentence_vec = torch.empty_like(text_vec, dtype=torch.float32)
+    for i in range(batch_size):
+        sentence_vec[i] =  text_vec[i]/sentence_len[i]
+    # repeat for 24 times cause i want to concat with so3    
+    sentence_vec = sentence_vec.repeat(1,24,1)
+    return sentence_vec
+
+def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, sentence_match, sentence_mismatch):  
     epsilon = torch.rand(batch_size, dtype=torch.float32).to(device)  
     ##########################
     # get so3_interpolated
@@ -38,7 +50,7 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
     so3_interpolated  = epsilon * so3_real + ((1 - epsilon) * so3_fake)"""
     so3_interpolated = Variable(so3_interpolated, requires_grad=True)    
     # calculate gradient penalty
-    score_interpolated_fake = net_d(so3_interpolated, text_match, text_match_mask)
+    score_interpolated_fake = net_d(so3_interpolated, sentence_match)
     gradient_fake = grad(outputs=score_interpolated_fake, 
                     inputs=so3_interpolated, 
                     grad_outputs=torch.ones_like(score_interpolated_fake, requires_grad=False).to(device),
@@ -48,21 +60,16 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
     ##########################
     # get text_interpolated
     ##########################
-    text_interpolated = torch.empty_like(text_match, dtype=torch.float32).to(device)  
+    sentence_interpolated = torch.empty_like(sentence_match, dtype=torch.float32).to(device)  
     for j in range(batch_size):
-        text_interpolated[j] = epsilon[j] * text_match[j] + (1 - epsilon[j]) * text_mismatch[j]    
+        sentence_interpolated[j] = epsilon[j] * sentence_match[j] + (1 - epsilon[j]) * sentence_mismatch[j]    
     
     #text_interpolated = epsilon * text_match + ((1 - epsilon) * text_mismatch)
-    text_interpolated = Variable(text_interpolated, requires_grad=True)
+    sentence_interpolated = Variable(sentence_interpolated, requires_grad=True)
 
-    f_mask = lambda x,y: torch.tensor([1 if x[i] or y[i] else 0 for i in range(len(x))])
-    text_interpolated_mask = torch.empty_like(text_match_mask, dtype=torch.float32).to(device)
-    text_interpolated_mask = Variable(text_interpolated_mask, requires_grad=True)
-    for i in range(batch_size):
-        text_interpolated_mask[i] = f_mask(text_match_mask[0], text_mismatch_mask[0])
-    score_interpolated_wrong = net_d(so3_real, text_interpolated, text_interpolated_mask)
+    score_interpolated_wrong = net_d(so3_real, sentence_interpolated)
     gradient_wrong = grad(outputs=score_interpolated_wrong, 
-                    inputs=text_interpolated, 
+                    inputs=sentence_interpolated, 
                     grad_outputs=torch.ones_like(score_interpolated_wrong).to(device),
                     create_graph=True, 
                     retain_graph=True)[0]
@@ -82,24 +89,26 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
     so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
+    sentence_match = get_sentence_vec(cfg.BATCH_SIZE,text_match,text_match_mask)
     text_mismatch = batch.get('vec_mismatch').to(device)
     text_mismatch_mask = batch.get('vec_mismatch_mask').to(device)
+    sentence_mismatch = get_sentence_vec(cfg.BATCH_SIZE,text_mismatch,text_mismatch_mask)
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     
     if update_d:
         # ground truth
-        score_right = net_d(so3_real, text_match, text_match_mask).mean()
+        score_right = net_d(so3_real, sentence_match).mean()
         # tex mismatch
-        score_wrong = net_d(so3_real, text_mismatch, text_mismatch_mask).mean()
+        score_wrong = net_d(so3_real, sentence_mismatch).mean()
         # fake so3 by generator
         so3_fake = net_g(noise, text_match, text_match_mask).detach()
-        score_fake = net_d(so3_fake, text_match, text_match_mask).mean()        
+        score_fake = net_d(so3_fake, sentence_match).mean()        
     else:
         with torch.no_grad():
-            score_right = net_d(so3_real, text_match, text_match_mask).detach().mean()
-            score_wrong = net_d(so3_real, text_mismatch, text_mismatch_mask).detach().mean()
+            score_right = net_d(so3_real, sentence_match).detach().mean()
+            score_wrong = net_d(so3_real, sentence_mismatch).detach().mean()
             so3_fake = net_g(noise, text_match, text_match_mask).detach()
-            score_fake = net_d(so3_fake, text_match, text_match_mask).detach().mean()
+            score_fake = net_d(so3_fake, sentence_match).detach().mean()
 
     if algorithm == 'wgan':
         if update_d:
@@ -112,7 +121,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
                 p.data.clamp_(-c, c)
     elif algorithm == 'wgan-gp':
         if update_d:
-            grad_penalty_fake, grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask)
+            grad_penalty_fake, grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_fake, sentence_match, sentence_mismatch)
             grad_penalty_fake = grad_penalty_fake.mean()
             grad_penalty_wrong = grad_penalty_wrong.mean()
         
@@ -139,26 +148,28 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
     # get sentence vectors and noises
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
+    sentence_match = get_sentence_vec(cfg.BATCH_SIZE,text_match,text_match_mask)
     text_interpolated = batch.get('vec_interpolated').to(device)
     text_interpolated_mask = batch.get('vec_interpolated_mask').to(device)
+    sentence_interpolated = get_sentence_vec(cfg.BATCH_SIZE,text_interpolated,text_interpolated_mask)
     noise1 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     noise2 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
 
     if update_g:
         # so3 fake
         so3_fake = net_g(noise1, text_match, text_match_mask)
-        score_fake = net_d(so3_fake, text_match, text_match_mask).mean()
+        score_fake = net_d(so3_fake, sentence_match).mean()
         # so3 interpolated
         so3_interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
-        score_interpolated = net_d(so3_interpolated, text_interpolated, text_interpolated_mask).mean()
+        score_interpolated = net_d(so3_interpolated, sentence_interpolated).mean()
     else:
         with torch.no_grad():
             # so3 fake
             so3_fake = net_g(noise1, text_match, text_match_mask)
-            score_fake = net_d(so3_fake, text_match, text_match_mask).detach().mean()
+            score_fake = net_d(so3_fake, sentence_match).detach().mean()
             # so3 interpolated
             so3_interpolated = net_g(noise2, text_interpolated, text_interpolated_mask)
-            score_interpolated = net_d(so3_interpolated, text_interpolated, text_interpolated_mask).detach().mean()
+            score_interpolated = net_d(so3_interpolated, sentence_interpolated).detach().mean()
     
     if update_g:
         # 'wgan', 'wgan-gp' and 'wgan-lp'
@@ -283,9 +294,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    a = torch.tensor(0)
-
-    print(a+1)
+    a = torch.tensor([[1,1,1,1,1],[2,2,2,2,2]])
+    print(a.size())
+    print(a.sum(1))
+    print(a.size())
 
     
     

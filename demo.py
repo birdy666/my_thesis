@@ -14,7 +14,8 @@ import numpy as np
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/epoch_254' + ".chkpt")
+    #checkpoint = torch.load('./models/epoch_254' + ".chkpt") #in docker
+    checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_254' + ".chkpt")
     net_g = Generator(cfg).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
@@ -22,7 +23,8 @@ if __name__ == "__main__":
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
     fasttext.util.reduce_model(text_model, 150)
     
-    with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
+    #with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
+    with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
         eft_all_with_caption = json.load(f)
   
     
@@ -46,6 +48,16 @@ if __name__ == "__main__":
         so3_fake = net_g(noise, text_match, text_match_mask)
         
         so3_fake = so3_fake[0].detach().numpy()
+        text_match = text_match.sum().unsqueeze(0)
+        # get average
+        sentence_len = text_match_mask.sum(1)
+        sentence_vec = torch.empty_like(text_match, dtype=torch.float32)
+        
+        sentence_vec =  text_match/sentence_len
+        print(text_match)
+        print(so3_fake)
+        print(sentence_vec)
+        print(dfs0)
         parm_pose = []
         for j in range(len(so3_fake)):
             parm_pose.append(so32rotation(so3_fake[j]))
