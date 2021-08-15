@@ -27,8 +27,18 @@ class Encoder(nn.Module):
         """input_vec_noise = torch.cat((input_vec, noise), -1)"""        
         if self.cfg.SCALE_EMB_G:
             input_vec *= 150 ** 0.5
+        """print("Before anything")
+        print(input_vec[0])
         input_vec = self.dropout(self.position_enc(input_vec))
+        print("After position_enc")
+        print(input_vec[0])
         enc_output  = self.layer_norm(input_vec)
+        print("After layernorm")
+        print(enc_output[0])
+        print("Diff")
+        print(enc_output[0]-input_vec[0])
+        print(sfsdf)"""
+        enc_output = input_vec
 
         for enc_layer in self.encoder_stack:
             """
