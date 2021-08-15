@@ -60,10 +60,10 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, sentence_mat
     ##########################
     # get text_interpolated
     ##########################
-    sentence_interpolated = torch.empty_like(sentence_match, dtype=torch.float32).to(device)  
+    """sentence_interpolated = torch.empty_like(sentence_match, dtype=torch.float32).to(device)  
     for j in range(batch_size):
-        sentence_interpolated[j] = epsilon[j] * sentence_match[j] + (1 - epsilon[j]) * sentence_mismatch[j]    
-    
+        sentence_interpolated[j] = epsilon[j] * sentence_match[j] + (1 - epsilon[j]) * sentence_mismatch[j]"""    
+    sentence_interpolated = sentence_mismatch
     #text_interpolated = epsilon * text_match + ((1 - epsilon) * text_mismatch)
     sentence_interpolated = Variable(sentence_interpolated, requires_grad=True)
 
