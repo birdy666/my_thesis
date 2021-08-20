@@ -72,15 +72,15 @@ class Decoder(nn.Module):
         #if self.cfg.SCALE_EMB_G:
         #    input_vec *= self.cfg.D_MODEL_LIST_G[0] ** 0.5
         #input_vec = self.dropout(self.position_enc(input_vec))
-        dec_input  = self.layer_norm(self.dropout(dec_input))
-
+        """dec_input  = self.layer_norm(self.dropout(dec_input))"""
+        dec_output = dec_input
         for dec_layer in self.decoder_stack:
             """
             enc_output: (batch, text_len, word_emb_len + noise_len)
             src_mask: (batch, text_len) ==> unsqueeze(-2) ==> (batch, 1, text_len)
             """
-            enc_output = dec_layer(dec_input, enc_output, slf_attn_mask=None, dec_enc_attn_mask=enc_mask.unsqueeze(-2)) 
-        return enc_output
+            dec_output = dec_layer(dec_output, enc_output, slf_attn_mask=None, dec_enc_attn_mask=enc_mask.unsqueeze(-2)) 
+        return dec_output
 
 
 class Transformer(nn.Module):
