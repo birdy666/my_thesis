@@ -208,7 +208,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
         # after training discriminator for N times, train gernerator for 1 time
-        if e % 5 == 0:
+        if (i+1) % cfg.N_train_D_1_train_G == 0:
             # to avoid computation of net d
             for p in net_d.parameters():
                 p.requires_grad = False
