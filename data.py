@@ -66,8 +66,8 @@ def getData(cfg):
     print("create dataloaders")
     # get the dataset (single person, with captions)
     train_size = int(len(eft_all_with_caption)*0.9)
-    dataset_train = TheDataset(cfg, eft_all_with_caption[:train_size], coco_caption, text_model=text_model)
-    dataset_val = TheDataset(cfg, eft_all_with_caption[train_size:], coco_caption, text_model=text_model)
+    dataset_train = TheDataset(cfg, eft_all_with_caption[:128], coco_caption, text_model=text_model)
+    dataset_val = TheDataset(cfg, eft_all_with_caption[128:128], coco_caption, text_model=text_model)
     
     #return text_model, dataset, dataset_val, data_loader#, text_match_val, label_val
     return text_model, eft_all_with_caption, dataset_train, dataset_val

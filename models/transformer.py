@@ -68,35 +68,18 @@ class Decoder(nn.Module):
 class Transformer(nn.Module):
     ''' A sequence to sequence model with attention mechanism. '''
 
-    def __init__(self, enc_param, dec_param, fc_list):
+    def __init__(self, encoder, decoder, fc_list):
         super().__init__()
-
-        self.encoder = Encoder(n_layers=enc_param.n_layers, 
-                                d_model=enc_param.d_model, 
-                                d_inner_scale=enc_param.d_inner_scale, 
-                                n_head=enc_param.n_head, 
-                                d_k=enc_param.d_k, 
-                                d_v=enc_param.d_v, 
-                                dropout=enc_param.dropout, 
-                                scale_emb=enc_param.scale_emb)
-
-        self.decoder = Decoder(n_layers=dec_param.n_layers, 
-                                d_model=dec_param.d_model, 
-                                d_inner_scale=dec_param.d_inner_scale, 
-                                n_head=dec_param.n_head, 
-                                d_k=dec_param.d_k, 
-                                d_v=dec_param.d_v, 
-                                dropout=dec_param.dropout, 
-                                scale_emb=dec_param.scale_emb)
-        
+        self.encoder = encoder
+        self.decoder = decoder
         layers = []
         for i in range(len(fc_list)-1):
             layers.append(nn.Linear(fc_list[i], fc_list[i+1]))
         self.fcs = nn.Sequential(*layers)
 
-        for p in self.parameters():
+        """"for p in self.parameters():
             if p.dim() > 1:
-                nn.init.xavier_uniform_(p) 
+                nn.init.xavier_uniform_(p) """
 
     def forward(self, enc_input, enc_mask, dec_input, dec_mask=None):
         # encoder output

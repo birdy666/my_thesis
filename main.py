@@ -18,7 +18,7 @@ if __name__ == "__main__":
     text_model, eft_all_with_caption, dataset_train, dataset_val = getData(cfg)    
     net_g, net_d = getModels(cfg, device, checkpoint) 
 
-    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS, drop_last=True)
+    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, drop_last=True)
     dataLoader_val = torch.utils.data.DataLoader(dataset_val, batch_size=cfg.BATCH_SIZE, shuffle=False, drop_last=True)
     
     # 這裡原本論文因為輸入輸出一樣 所以他這裡直接把d_model當作一個像是常數的參數 但我的模型不一樣 ...
