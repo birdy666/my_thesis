@@ -201,14 +201,14 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         total_loss_d += loss_d.item()
         
         if tb_writer != None:
-            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*149+i)
+            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
         """# log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
         ###############################################################
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
         # after training discriminator for N times, train gernerator for 1 time
-        if e % 2 == 0:
+        if (i+1) % cfg.N_train_D_1_train_G == 0:
             # to avoid computation of net d
             for p in net_d.parameters():
                 p.requires_grad = False
@@ -226,8 +226,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
             """# log
             writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)"""
             if tb_writer != None:
-                #tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*149+i)
-                tb_writer.add_scalar('loss_g_', score_fake, e*149+i)
+                tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*len(dataLoader_train)+i)
     return total_loss_g, total_loss_d
 
 def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
@@ -280,7 +279,8 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
         # save model for each 5 epochs
-        if e % 5 == 4:
+        #if e % 5 == 4:
+        if True:
             save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
         print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes (" + str(elapse_mid/60) + " hours)")

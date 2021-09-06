@@ -14,8 +14,8 @@ import numpy as np
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/epoch_284' + ".chkpt") #in docker
-    #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_284' + ".chkpt")
+    checkpoint = torch.load('./models/checkpoints/epoch_564' + ".chkpt") #in docker
+    #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_254' + ".chkpt")
     net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
@@ -50,6 +50,9 @@ if __name__ == "__main__":
         
         so3_fake = so3_fake[0].detach().numpy()
         text_match = text_match.sum().unsqueeze(0)
+        
+        sentence_vec =  text_match/sentence_len
+        print(caption)
         
         parm_pose = []
         for j in range(len(so3_fake)):

@@ -7,7 +7,7 @@ import json
 import os
 import random
 from tqdm import tqdm
-
+#import cv2
 import string
 
 
@@ -29,69 +29,62 @@ from config import cfg
     #data['subjectId']          #(optional) a unique id per sequence. usually {seqName}_{id}
     #Load EFT fitting data
 
-def getEFTCaption(cfg, coco_caption):
-    if os.path.isfile(cfg.EFT_FIT_WITH_CAPTION_PATH):
-        with open(cfg.EFT_FIT_WITH_CAPTION_PATH,'r') as f:
-            eft_all_with_caption = json.load(f)
-    else:
-        print(f"Loading EFT data from {cfg.EFT_FIT_PATH}")
-        with open(cfg.EFT_FIT_PATH,'r') as f:
-            eft_data = json.load(f)
-            print("EFT data: ver {}".format(eft_data['ver']))
-
-            eft_data_all = eft_data['data']
-        print(len(eft_data_all))    
-
-        # Not all the annotID in eft_all are also in caption_train2014, need to filter them out
-        annids_captopn = coco_caption.getAnnIds()
-        #annids_keypoints=coco_keypoints.getAnnIds()
-        eft_all_with_caption = []
-        for i in range(len(eft_data_all)):
-            if eft_data_all[i]['annotId'] in annids_captopn:
-                eft_all_with_caption.append(eft_data_all[i])
-        print(len(eft_all_with_caption))
-        with open(cfg.EFT_FIT_WITH_CAPTION_PATH, 'w') as f:
-            json.dump(eft_all_with_caption, f)
-    
-    return eft_all_with_caption
+def getEFTCaption(cfg):
+    with open(cfg.EFT_FIT_PATH,'r') as f:
+        eft_data = json.load(f)
+        print("EFT data: ver {}".format(eft_data['ver']))
+        eft_data_all = eft_data['data']    
+    return eft_data_all
 
 def getData(cfg):
-    # read captions and keypoints from files
+    # load coco  
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
-    # load text encoding model
+    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
+    # load text model
+    print("Loading text model")
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)  
     fasttext.util.reduce_model(text_model, 150)
-    eft_all_with_caption = getEFTCaption(cfg, coco_caption)    
-    print("create dataloaders")
+    print("Text model loaded")
+    # load eft data
+    eft_data_all = getEFTCaption(cfg)        
     # get the dataset (single person, with captions)
-    train_size = int(len(eft_all_with_caption)*0.9)
-    dataset_train = TheDataset(cfg, eft_all_with_caption[:128], coco_caption, text_model=text_model)
-    dataset_val = TheDataset(cfg, eft_all_with_caption[128:128], coco_caption, text_model=text_model)
-    
+    train_size = int(len(eft_data_all)*0.9)
+    print("Creating dataset_train")
+    dataset_train = TheDataset(cfg, eft_data_all[:train_size], coco_caption, coco_keypoint, text_model=text_model)
+    print("Creating dataset_val")
+    dataset_val = TheDataset(cfg, eft_data_all[train_size:], coco_caption, coco_keypoint, text_model=text_model)
+    print("Datasets created")
     #return text_model, dataset, dataset_val, data_loader#, text_match_val, label_val
-    return text_model, eft_all_with_caption, dataset_train, dataset_val
+    return text_model, eft_data_all, dataset_train, dataset_val
 
 
 class TheDataset(torch.utils.data.Dataset):
-    def __init__(self, cfg, eft_all_with_caption, coco_caption, text_model=None, val=False):
+    def __init__(self, cfg, eft_data_all, coco_caption, coco_keypoint, text_model=None, val=False):
         self.dataset = []
         self.cfg = cfg
-        for i in range(len(eft_all_with_caption)):
-            data = {'caption': coco_caption.loadAnns(eft_all_with_caption[i]['annotId'])[0]['caption'],
-                    'parm_pose': eft_all_with_caption[i]['parm_pose'],
-                    'parm_shape': eft_all_with_caption[i]['parm_shape'],
-                    'smpltype': eft_all_with_caption[i]['smpltype'],
-                    'annotId': eft_all_with_caption[i]['annotId'],
-                    'imageName': eft_all_with_caption[i]['imageName']}
-            data['so3'] = np.array([rotation2so3(R) for R in data['parm_pose']])
-            # add sentence encoding
-            if text_model is not None:
-                # 加這一行資料量從19116 變 19083 但可以刷掉一些感覺就跟人沒有關的怪異資料
-                caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
-                if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
-                    data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN, cfg.D_WORD_VEC)
-                    self.dataset.append(data)      
+        for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):
+            # 一筆eft資料只有一筆img_id
+            img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
+            # 但對於同一個圖片會有很多語意相同的captions
+            caption_ids = coco_caption.getAnnIds(imgIds=img_id)
+            captions_anns = coco_caption.loadAnns(ids=caption_ids)
+            # 每個cation都創一個資料
+            for j, caption_ann in enumerate(captions_anns):
+                if j > 3:
+                    break
+                data = {'caption': caption_ann['caption'],
+                        'parm_pose': eft_data_all[i]['parm_pose'],
+                        'parm_shape': eft_data_all[i]['parm_shape'],
+                        'smpltype': eft_data_all[i]['smpltype'],
+                        'annotId': eft_data_all[i]['annotId'],
+                        'imageName': eft_data_all[i]['imageName']}
+                data['so3'] = np.array([rotation2so3(R) for R in data['parm_pose']])
+                # add sentence encoding
+                if text_model is not None:
+                    caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
+                    if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
+                        data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN, cfg.D_WORD_VEC)
+                        self.dataset.append(data)      
     
     def __len__(self):
         return len(self.dataset)
@@ -129,29 +122,17 @@ class TheDataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    print("This is data.py")
-    """
-    如果有朝一日想要換vector的為度
-    ft = fasttext.load_model(cfg.TEXT_MODEL_PATH)
-    print(ft.get_dimension())
-    fasttext.util.reduce_model(ft, 100)
-    print(ft.get_dimension())"""
+    """coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
+    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
+    generate_eft(cfg, coco_caption, coco_keypoint)"""
+    #with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
+    with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
+        eft_all_with_caption = json.load(f)
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    #coco_caption_val = COCO(cfg.COCO_CAPTION_val)
-    # load text encoding model
-    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)    
-    eft_all_with_caption = getEFTCaption(cfg, coco_caption)    
-    print("create dataloaders")
-    # get the dataset (single person, with captions)
-    train_size = int(len(eft_all_with_caption)*0.9)
-    dataset_train = TheDataset(cfg, eft_all_with_caption[:train_size], coco_caption, text_model=text_model)
-    dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.WORKERS)
-    desc = '  - (Training)   '
-    # torch.cat((noise_vector, sentence_vector), 1)
-    # noise_tensor = torch.randn((number, noise_size, 1, 1), dtype=torch.float32)
-    for i, batch in enumerate(tqdm(dataLoader_train, desc=desc)):
-        """noise_tensor = torch.randn((number, 300, 1, 1), dtype=torch.float32)
-        torch.cat((batch.get('vector'), noise_tensor), 1)"""
-        print(batch.size()[0])
-        
-        break
+    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
+    for i in range(1):
+        print(eft_all_with_caption[i]['imageName'])
+        imgid = coco_keypoint.loadAnns(eft_all_with_caption[17]['annotId'])[0]['image_id']
+        caption_ids = coco_caption.getAnnIds(imgIds=imgid)
+        captions = coco_caption.loadAnns(ids=caption_ids)
+        print(captions)
