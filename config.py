@@ -35,15 +35,15 @@ __C.D_WORD_VEC = 150
 __C.SCORE_WRONG_WEIGHT_D = 0.6 # SCORE_RIGHT_WEIGHT_D
 __C.SCORE_FAKE_WEIGHT_D = 0.3 # SCORE_RIGHT_WEIGHT_D
 __C.SCORE_RIGHT_WEIGHT_D = __C.SCORE_WRONG_WEIGHT_D + __C.SCORE_FAKE_WEIGHT_D
-__C.PENALTY_WEIGHT_WRONG = 10
-__C.PENALTY_WEIGHT_FAKE = 5
+__C.PENALTY_WEIGHT_WRONG = 0.6
+__C.PENALTY_WEIGHT_FAKE = 0.3
 
 # Model g
-__C.ENC_PARAM_G = edict({'n_layers':8, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':2, 'dropout':0.1, 'scale_emb':False})
-__C.DEC_PARAM_G = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+__C.ENC_PARAM_G = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.FC_LIST_G = [150, 300, 256, 128, 64, 32, 16, 8, 3]
+__C.DEC_PARAM_G = edict({'n_layers':2, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
+__C.FC_LIST_G = [150, 128, 64, 32, 16, 8, 3]
 
 
 # Model d
