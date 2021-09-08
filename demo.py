@@ -14,17 +14,17 @@ import numpy as np
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
-    #checkpoint = torch.load('./models/epoch_254' + ".chkpt") #in docker
-    checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_254' + ".chkpt")
-    net_g = Generator(cfg).to(device)
+    checkpoint = torch.load('./models/epoch_284' + ".chkpt") #in docker
+    #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_284' + ".chkpt")
+    net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
     fasttext.util.reduce_model(text_model, 150)
     
-    #with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
-    with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
+    with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
+    #with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
         eft_all_with_caption = json.load(f)
   
     
@@ -38,6 +38,7 @@ if __name__ == "__main__":
         #text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
         #text_match_mask = batch.get('vec_mask').to(device)
         caption =  coco_caption.loadAnns(eft_all_fake[i]['annotId'])[0]['caption']
+        print(caption)
         caption_without_punctuation = ''.join([i for i in caption if i not in string.punctuation])
         data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN, cfg.D_WORD_VEC)
     
@@ -45,19 +46,11 @@ if __name__ == "__main__":
         text_match_mask = torch.tensor(data['vec_mask'], dtype=torch.int).unsqueeze(0)
         noise = torch.randn((1, 24, 150), dtype=torch.float32).to(device)
         
-        so3_fake = net_g(noise, text_match, text_match_mask)
+        so3_fake = net_g(text_match, text_match_mask, noise)
         
         so3_fake = so3_fake[0].detach().numpy()
         text_match = text_match.sum().unsqueeze(0)
-        # get average
-        sentence_len = text_match_mask.sum(1)
-        sentence_vec = torch.empty_like(text_match, dtype=torch.float32)
         
-        sentence_vec =  text_match/sentence_len
-        print(text_match)
-        print(so3_fake)
-        print(sentence_vec)
-        print(dfs0)
         parm_pose = []
         for j in range(len(so3_fake)):
             parm_pose.append(so32rotation(so3_fake[j]))

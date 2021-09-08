@@ -161,10 +161,10 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         so3_fake_d = net_d(text_match, text_match_mask, so3_fake.repeat(1,1,50))
         score_fake = get_d_score(so3_real, so3_fake_d)
         # so3 interpolated
-        so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
+        """so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
         so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated.repeat(1,1,50))
-        score_interpolated = get_d_score(so3_real, so3_interpolated_d)
-        
+        score_interpolated = get_d_score(so3_real, so3_interpolated_d)"""
+        score_interpolated = 0
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
         loss_g = -(score_fake)
@@ -214,7 +214,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
                 p.requires_grad = False
             #get losses
             score_fake, score_interpolated = get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
-            loss_g = -(score_fake+ score_interpolated)
+            loss_g = -(score_fake)
             total_loss_g += loss_g.item()
             # to enable computation of net d
             for p in net_d.parameters():
@@ -269,10 +269,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         lr_d=optimizer_d._optimizer.param_groups[0].get('lr')
         print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d, e)
         
-        """ # Validation!!
+        # Validation!!
         start = time.time()
         val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
-        print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)"""
+        print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
         # save model for each 5 epochs
         if e % 5 == 4:
@@ -288,10 +288,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
                 epoch=e, loss_g=val_loss_g, loss_d=val_loss_d))"""
 
         if cfg.USE_TENSORBOARD:
-            """tb_writer.add_scalars('loss_g', {'train': train_loss_g, 'val': val_loss_g}, e)
-            tb_writer.add_scalars('loss_d', {'train': train_loss_d, 'val': val_loss_d}, e)"""
-            tb_writer.add_scalar('loss_g', train_loss_g, e)
-            tb_writer.add_scalar('loss_d', train_loss_d, e)
+            tb_writer.add_scalars('loss_g', {'train': train_loss_g, 'val': val_loss_g}, e)
+            tb_writer.add_scalars('loss_d', {'train': train_loss_d, 'val': val_loss_d}, e)
+            """tb_writer.add_scalar('loss_g', train_loss_g, e)
+            tb_writer.add_scalar('loss_d', train_loss_d, e)"""
             """tb_writer.add_scalar('learning_rate_g', lr_g, e)
             tb_writer.add_scalar('learning_rate_d', lr_d, e)"""
         
