@@ -167,7 +167,7 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
-        loss_g = -(score_fake + score_interpolated)
+        loss_g = -(score_fake)
         loss_g.backward()
         optimizer_g.step_and_update_lr()
     else:
@@ -201,7 +201,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         total_loss_d += loss_d.item()
         
         if tb_writer != None:
-            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*149+i)
+            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
         """# log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
         ###############################################################
@@ -222,7 +222,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
             """# log
             writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)"""
             if tb_writer != None:
-                tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*149+i)
+                tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*len(dataLoader_train)+i)
     return total_loss_g, total_loss_d
 
 def val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val):
