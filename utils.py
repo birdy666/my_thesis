@@ -33,8 +33,8 @@ def get_caption_vector(text_model, caption_without_punctuation, max_sentence_len
 """TODO 24is hyperparameter"""
 # get a batch of noise vectors
 def get_noise_tensor(batch_size,  noise_size):
-    """batch_size x 24 x 300"""
-    noise_tensor = torch.randn((batch_size, 24, noise_size), dtype=torch.float32)
+    """batch_size x 24 x noise_size"""
+    noise_tensor = torch.randn((batch_size, 24, 3), dtype=torch.float32).repeat(1,1,50)
     return noise_tensor
 
 def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):

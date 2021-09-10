@@ -212,15 +212,15 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         # after training discriminator for N times, train gernerator for 1 time
         if (i+1) % cfg.N_train_D_1_train_G == 0:
             # to avoid computation of net d
-            for p in net_d.parameters():
-                p.requires_grad = False
+            """ for p in net_d.parameters():
+                p.requires_grad = False"""
             #get losses
             score_fake, score_interpolated = get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
             loss_g = -(score_fake)
             total_loss_g += loss_g.item()
             # to enable computation of net d
-            for p in net_d.parameters():
-                p.requires_grad = True
+            """for p in net_d.parameters():
+                p.requires_grad = True"""
             """# log
             writer.add_scalar('loss/g', loss_g, batch_number * (e - start_from_epoch) + i)"""
             if tb_writer != None:
