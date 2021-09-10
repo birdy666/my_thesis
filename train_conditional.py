@@ -163,13 +163,12 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         so3_fake_d = net_d(text_match, text_match_mask, so3_fake.repeat(1,1,50))
         score_fake = get_d_score(so3_real, so3_fake_d)
         # so3 interpolated
-        """so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
+        so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
         so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated.repeat(1,1,50))
-        score_interpolated = get_d_score(so3_real, so3_interpolated_d)"""
-        score_interpolated = 0
+        score_interpolated = get_d_score(so3_real, so3_interpolated_d)
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
-        loss_g = -(score_fake)
+        loss_g = - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_WRONG_WEIGHT_G * score_interpolated)
         loss_g.backward()
         optimizer_g.step_and_update_lr()
     else:
@@ -216,7 +215,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
                 p.requires_grad = False"""
             #get losses
             score_fake, score_interpolated = get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
-            loss_g = -(score_fake)
+            loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_WRONG_WEIGHT_G * score_interpolated)
             total_loss_g += loss_g.item()
             # to enable computation of net d
             """for p in net_d.parameters():
@@ -251,7 +250,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
     # tensorboard
     if cfg.USE_TENSORBOARD:
         print("[Info] Use Tensorboard")  
-        tb_writer = SummaryWriter(log_dir=os.path.join(cfg.OUTPUT_DIR, 'tensorboard')) 
+        tb_writer = SummaryWriter(log_dir=cfg.TB_DIR) 
        
     # create log files
     log_train_file = os.path.join(cfg.OUTPUT_DIR, 'train.log')

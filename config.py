@@ -15,9 +15,10 @@ cfg = __C
 __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
-__C.START_FROM_EPOCH = 0#200
+__C.START_FROM_EPOCH = 35#200
 __C.END_IN_EPOCH = 1200#1200
-__C.CHKPT_PATH = project_dir + '/models/checkpoints'
+__C.CHKPT_PATH = project_dir + '/models/checkpoints_23'
+__C.TB_DIR = project_dir + '/output/tensorboard_' + str(23)
 
 # training
 __C.N_train_D_1_train_G = 1 # train discriminator k times before training generator
@@ -37,6 +38,9 @@ __C.SCORE_FAKE_WEIGHT_D = 1 # SCORE_RIGHT_WEIGHT_D
 __C.SCORE_RIGHT_WEIGHT_D = __C.SCORE_WRONG_WEIGHT_D + __C.SCORE_FAKE_WEIGHT_D
 __C.PENALTY_WEIGHT_WRONG = 1
 __C.PENALTY_WEIGHT_FAKE = 1
+
+__C.SCORE_FAKE_WEIGHT_G = 4
+__C.SCORE_WRONG_WEIGHT_G = 2 # SCORE_RIGHT_WEIGHT_D
 
 # Model g
 __C.ENC_PARAM_G = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
