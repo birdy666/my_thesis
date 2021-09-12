@@ -49,7 +49,7 @@ class Discriminator(nn.Module):
     def forward(self, input_text, input_mask, rot_vec):
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
-                                dec_input=rot_vec*0.1, 
+                                dec_input=rot_vec.repeat(1,1,50), 
                                 dec_mask=None)
         return output
 

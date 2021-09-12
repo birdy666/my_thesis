@@ -38,7 +38,7 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
     so3_interpolated  = epsilon * so3_real + ((1 - epsilon) * so3_fake)"""
     so3_interpolated = Variable(so3_interpolated, requires_grad=True)    
     # calculate gradient penalty
-    so3_interpolated_so3_d = net_d(text_match, text_match_mask, so3_interpolated.repeat(1,1,50))
+    so3_interpolated_so3_d = net_d(text_match, text_match_mask, so3_interpolated)
     score_interpolated_fake = get_d_score(so3_real, so3_interpolated_so3_d)
     gradient_fake = grad(outputs=score_interpolated_fake, 
                     inputs=so3_interpolated, 
@@ -60,7 +60,7 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
     for i in range(batch_size):
         text_interpolated_mask[i] = f_mask(text_match_mask[0], text_mismatch_mask[0])
 
-    so3_interpolated_text_d = net_d(text_interpolated, text_interpolated_mask, so3_real.repeat(1,1,50))
+    so3_interpolated_text_d = net_d(text_interpolated, text_interpolated_mask, so3_real)
     score_interpolated_wrong = get_d_score(so3_real, so3_interpolated_text_d)
     gradient_wrong = grad(outputs=score_interpolated_wrong, 
                     inputs=text_interpolated, 
@@ -92,26 +92,26 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     if update_d:
         # ground truth
-        so3_real_d = net_d(text_match, text_match_mask, so3_real.repeat(1,1,50))
+        so3_real_d = net_d(text_match, text_match_mask, so3_real)
         score_right = get_d_score(so3_real, so3_real_d)
         # tex mismatch
-        so3_wrong_d = net_d(text_mismatch, text_mismatch_mask, so3_real.repeat(1,1,50))
+        so3_wrong_d = net_d(text_mismatch, text_mismatch_mask, so3_real)
         score_wrong = get_d_score(so3_real, so3_wrong_d)
         # fake so3 by generator
         so3_fake = net_g(text_match, text_match_mask, noise).detach()
-        so3_fake_d = net_d(text_match, text_match_mask, so3_fake.repeat(1,1,50))
+        so3_fake_d = net_d(text_match, text_match_mask, so3_fake)
         score_fake = get_d_score(so3_real, so3_fake_d)        
     else:
         with torch.no_grad():
             # ground truth
-            so3_real_d = net_d(text_match, text_match_mask, so3_real.repeat(1,1,50)).detach()
+            so3_real_d = net_d(text_match, text_match_mask, so3_real).detach()
             score_right = get_d_score(so3_real, so3_real_d)
             # tex mismatch
-            so3_wrong_d = net_d(text_mismatch, text_mismatch_mask, so3_real.repeat(1,1,50)).detach()
+            so3_wrong_d = net_d(text_mismatch, text_mismatch_mask, so3_real).detach()
             score_wrong = get_d_score(so3_real, so3_wrong_d)
             # fake so3 by generator
             so3_fake = net_g(text_match, text_match_mask, noise).detach()
-            so3_fake_d = net_d(text_match, text_match_mask, so3_fake.repeat(1,1,50)).detach()
+            so3_fake_d = net_d(text_match, text_match_mask, so3_fake).detach()
             score_fake = get_d_score(so3_real, so3_fake_d)    
 
     if algorithm == 'wgan':
@@ -160,11 +160,11 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
     if update_g:
         # so3 fake
         so3_fake = net_g(text_match, text_match_mask, noise1)
-        so3_fake_d = net_d(text_match, text_match_mask, so3_fake.repeat(1,1,50))
+        so3_fake_d = net_d(text_match, text_match_mask, so3_fake)
         score_fake = get_d_score(so3_real, so3_fake_d)
         # so3 interpolated
         so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
-        so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated.repeat(1,1,50))
+        so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated)
         score_interpolated = get_d_score(so3_real, so3_interpolated_d)
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
@@ -175,11 +175,11 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         with torch.no_grad():            
             # so3 fake
             so3_fake = net_g(text_match, text_match_mask, noise1)
-            so3_fake_d = net_d(text_match, text_match_mask, so3_fake.repeat(1,1,50)).detach()
+            so3_fake_d = net_d(text_match, text_match_mask, so3_fake).detach()
             score_fake = get_d_score(so3_real, so3_fake_d)
             # so3 interpolated
             so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
-            so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated.repeat(1,1,50)).detach()
+            so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated).detach()
             score_interpolated = get_d_score(so3_real, so3_interpolated_d)
     
         
