@@ -43,18 +43,18 @@ __C.SCORE_FAKE_WEIGHT_G = 4
 __C.SCORE_WRONG_WEIGHT_G = 2 # SCORE_RIGHT_WEIGHT_D
 
 # Model g
-__C.ENC_PARAM_G = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+__C.ENC_PARAM_G = edict({'n_layers':6, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.DEC_PARAM_G = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+__C.DEC_PARAM_G = edict({'n_layers':1, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_G = [150, 128, 64, 32, 16, 8, 3]
 
 
 # Model d
 __C.ENC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.DEC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
+                'd_k':32, 'd_v':32, 'dropout':0.05, 'scale_emb':False})
+__C.DEC_PARAM_D = edict({'n_layers':2, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
 __C.FC_LIST_D = [150, 128, 64, 32, 16, 8, 3]
 
 # OPtimizer
