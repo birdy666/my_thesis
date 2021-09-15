@@ -76,8 +76,9 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
 
 def get_d_score(so3_real, so3_d):
     # (batch, 24) ==(mean)==> (512)
-    norm = torch.norm(so3_d-so3_real, p=2, dim=-1, keepdim=False).mean(1)    
-    return -torch.log(norm).mean()
+    """norm = torch.norm(so3_d-so3_real, p=2, dim=-1, keepdim=False).mean(1)    
+    return -torch.log(norm).mean()"""
+    return -torch.norm(so3_d-so3_real, p=2, dim=-1, keepdim=False).mean()
 
 def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True):
     if update_d:
