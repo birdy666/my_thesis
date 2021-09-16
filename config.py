@@ -15,13 +15,13 @@ cfg = __C
 __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
-__C.START_FROM_EPOCH = 1200#200
+__C.START_FROM_EPOCH = 880#200
 __C.END_IN_EPOCH = 2000#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
 
 # training
-__C.N_train_D_1_train_G = 5 # train discriminator k times before training generator
+__C.N_train_D_1_train_G = 3 # train discriminator k times before training generator
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 0.00001
 __C.LEARNING_RATE_D = 0.00001
@@ -40,7 +40,7 @@ __C.PENALTY_WEIGHT_WRONG = 1
 __C.PENALTY_WEIGHT_FAKE = 1
 
 __C.SCORE_FAKE_WEIGHT_G = 4
-__C.SCORE_WRONG_WEIGHT_G = 0 # SCORE_RIGHT_WEIGHT_D
+__C.SCORE_INTERPOLATE_WEIGHT_G = 2 # SCORE_RIGHT_WEIGHT_D
 
 # Model g
 __C.ENC_PARAM_G = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
@@ -53,7 +53,7 @@ __C.FC_LIST_G = [150, 128, 64, 32, 16, 8, 3]
 # Model d
 __C.ENC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
-__C.DEC_PARAM_D = edict({'n_layers':2, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+__C.DEC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
 __C.FC_LIST_D = [150, 128, 64, 32, 16, 8, 3]
 

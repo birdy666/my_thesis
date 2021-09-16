@@ -169,7 +169,7 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         score_interpolated = get_d_score(so3_real, so3_interpolated_d)
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
-        loss_g = - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_WRONG_WEIGHT_G * score_interpolated)
+        loss_g = - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G * score_interpolated)
         loss_g.backward()
         optimizer_g.step_and_update_lr()
     else:
@@ -204,6 +204,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         
         if tb_writer != None:
             tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
+            tb_writer.add_scalars('loss_d_wf', {'R_W': score_right-score_wrong, 'W_F': score_wrong-score_fake, 'ratio': (score_right-score_wrong)/(score_wrong-score_fake)}, e*len(dataLoader_train)+i)
         """# log
         writer.add_scalar('loss/d', loss_d, batch_number * (e - start_from_epoch) + i)"""
         ###############################################################
@@ -216,7 +217,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
                 p.requires_grad = False"""
             #get losses
             score_fake, score_interpolated = get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
-            loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_WRONG_WEIGHT_G * score_interpolated)
+            loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G * score_interpolated)
             total_loss_g += loss_g.item()
             # to enable computation of net d
             """for p in net_d.parameters():
@@ -277,7 +278,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
         # save model for each 5 epochs
-        if e % 5 == 4:
+        if e % 20 == 19:
             save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
         print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes (" + str(elapse_mid/60) + " hours)")
