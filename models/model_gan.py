@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 from models.transformer import Transformer
 from models.layers import PositionalEncoding, EncoderLayer, DecoderLayer
@@ -34,24 +35,38 @@ class Generator(nn.Module):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
 
+    def reg_output(self, output):
+        norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
+        # if the norm is smaller than pi than set it to pi, else dont change
+        norm = torch.clamp(norm, 2*math.pi, math.inf) 
+        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (2*math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)
+        return output
+
     def forward(self, input_text, input_mask, noise):
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
                                 dec_input=noise, 
-                                dec_mask=None)
-        return output
+                                dec_mask=None)        
+        return self.reg_output(output)
 
 class Discriminator(nn.Module):
     def __init__(self, enc_param, dec_param, fc_list):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
 
+    def reg_output(self, output):
+        norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
+        # if the norm is smaller than pi than set it to pi, else dont change
+        norm = torch.clamp(norm, 2*math.pi, math.inf) 
+        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (2*math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)
+        return output
+        
     def forward(self, input_text, input_mask, rot_vec):
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
                                 dec_input=rot_vec.repeat(1,1,50), 
                                 dec_mask=None)
-        return output
+        return self.reg_output(output)
 
 
 if __name__ == "__main__":

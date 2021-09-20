@@ -5,7 +5,7 @@ def rotation2AxisAngle(R):
     trace = np.array(R).trace()
     """他有些旋轉矩陣可能是經度造成的問題會有trace < -1 which is not possible"""
     if trace < -1:
-        trace = -1 + 0.000001
+        trace = -1 + 0.000000001
     angle = math.acos((trace-1)/2)
 
     denominator = math.sqrt((R[2][1] - R[1][2])**2+(R[0][2] - R[2][0])**2+(R[1][0] - R[0][1])**2)
