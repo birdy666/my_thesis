@@ -14,7 +14,7 @@ import numpy as np
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/epoch_4279' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_16059' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_284' + ".chkpt")
     net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
@@ -30,7 +30,7 @@ if __name__ == "__main__":
   
     
     eft_all_fake = copy.deepcopy(eft_all_with_caption)
-    eft_all_fake = eft_all_fake[:30]
+    eft_all_fake = eft_all_fake[:50]
     print(len(eft_all_fake))
     net_g.eval()
     

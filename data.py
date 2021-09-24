@@ -48,7 +48,8 @@ def getData(cfg):
     # load eft data
     eft_data_all = getEFTCaption(cfg)        
     # get the dataset (single person, with captions)
-    train_size = int(len(eft_data_all)*0.2*0.3)
+    train_size = int(len(eft_data_all)*0.2*0.3*0.05)
+    print("dataset size: ", train_size)
     print("Creating dataset_train")
     dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint, text_model=text_model)
     print("Creating dataset_val")
