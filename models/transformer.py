@@ -70,7 +70,7 @@ class Decoder(nn.Module):
 class Transformer(nn.Module):
     ''' A sequence to sequence model with attention mechanism. '''
 
-    def __init__(self, enc_param, dec_param, fc_list):
+    """def __init__(self, enc_param, dec_param, fc_list):
         super().__init__()
 
         self.encoder = Encoder(n_layers=enc_param.n_layers, 
@@ -89,7 +89,11 @@ class Transformer(nn.Module):
                                 d_k=dec_param.d_k, 
                                 d_v=dec_param.d_v, 
                                 dropout=dec_param.dropout, 
-                                scale_emb=dec_param.scale_emb)
+                                scale_emb=dec_param.scale_emb)"""
+    def __init__(self, encoder, decoder, fc_list):
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
         
         layers = []
         for i in range(len(fc_list)-1):

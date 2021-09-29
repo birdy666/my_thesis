@@ -2,6 +2,7 @@ import json
 import copy
 import torch
 from models.model_gan import Generator
+from models.transformer import Transformer, Encoder, Decoder
 from config import cfg
 from utils import get_noise_tensor, get_caption_vector
 import string
@@ -14,9 +15,29 @@ import numpy as np
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_9039' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints_34/epoch_199' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/epoch_284' + ".chkpt")
-    net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G).to(device)
+    #net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G).to(device)
+    
+    shareEncoder = Encoder(n_layers=cfg.ENC_PARAM.n_layers, 
+                            d_model=cfg.ENC_PARAM.d_model, 
+                            d_inner_scale=cfg.ENC_PARAM.d_inner_scale, 
+                            n_head=cfg.ENC_PARAM.n_head, 
+                            d_k=cfg.ENC_PARAM.d_k, 
+                            d_v=cfg.ENC_PARAM.d_v, 
+                            dropout=cfg.ENC_PARAM.dropout, 
+                            scale_emb=cfg.ENC_PARAM.scale_emb)
+
+    decoder_g = Decoder(n_layers=cfg.DEC_PARAM_G.n_layers, 
+                            d_model=cfg.DEC_PARAM_G.d_model, 
+                            d_inner_scale=cfg.DEC_PARAM_G.d_inner_scale, 
+                            n_head=cfg.DEC_PARAM_G.n_head, 
+                            d_k=cfg.DEC_PARAM_G.d_k, 
+                            d_v=cfg.DEC_PARAM_G.d_v, 
+                            dropout=cfg.DEC_PARAM_G.dropout, 
+                            scale_emb=cfg.DEC_PARAM_G.scale_emb)
+
+    net_g = Generator(shareEncoder, decoder_g, cfg.FC_LIST_G).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
@@ -24,12 +45,13 @@ if __name__ == "__main__":
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
     fasttext.util.reduce_model(text_model, 150)
     
-    with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
+    with open('../eft/eft_fit/COCO2014-All-ver01.json','r') as f: # in docker
     #with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
-        eft_all_with_caption = json.load(f)
+        eft_data = json.load(f)
+        eft_data_all = eft_data['data']    
   
     
-    eft_all_fake = copy.deepcopy(eft_all_with_caption)
+    eft_all_fake = copy.deepcopy(eft_data_all)
     eft_all_fake = eft_all_fake[:50]
     print(len(eft_all_fake))
     net_g.eval()
