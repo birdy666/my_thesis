@@ -40,7 +40,7 @@ __C.PENALTY_WEIGHT_WRONG = 1
 __C.PENALTY_WEIGHT_FAKE = 1
 
 __C.SCORE_FAKE_WEIGHT_G = 1
-__C.SCORE_INTERPOLATE_WEIGHT_G = 1 # SCORcE_RIGHT_WEIGHT_D
+__C.SCORE_INTERPOLATE_WEIGHT_G = 1 # SCORE_RIGHT_WEIGHT_D
 
 # Shared Encoder
 __C.SHARE_ENC = True
@@ -56,11 +56,11 @@ __C.FC_LIST_G = [150, 3]
 
 
 # Model d
-"""__C.ENC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})"""
-__C.DEC_PARAM_D = edict({'n_layers':2, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.FC_LIST_D = [150, 1]
+__C.ENC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
+__C.DEC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
+__C.FC_LIST_D = [150, 128, 64, 32, 16, 8, 3]
 
 # OPtimizer
 # ADAM solver

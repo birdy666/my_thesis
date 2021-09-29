@@ -94,7 +94,7 @@ class Discriminator(nn.Module):
                                 enc_mask=input_mask, 
                                 dec_input=rot_vec.repeat(1,1,50), 
                                 dec_mask=None)
-        return output
+        return self.reg_output(output)
 
 
 if __name__ == "__main__":
