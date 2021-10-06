@@ -53,12 +53,14 @@ class Decoder(nn.Module):
                                                         dropout=dropout)
                                                         for _ in range(n_layers)])
 
-    def forward(self, enc_output, enc_mask, dec_input, dec_mask):
+    def forward(self, enc_output, enc_mask, dec_input, dec_mask=None):
         # -- Forward
         #if self.cfg.SCALE_EMB_G:
         #    input_vec *= self.cfg.D_MODEL_LIST_G[0] ** 0.5
         #input_vec = self.dropout(self.position_enc(input_vec))
         """dec_input  = self.layer_norm(self.dropout(dec_input))"""
+        if dec_mask is not None:
+            dec_mask= dec_mask.unsqueeze(-2)
         dec_output = dec_input
         for dec_layer in self.decoder_stack:
             dec_output = dec_layer(dec_output, enc_output, slf_attn_mask=dec_mask, dec_enc_attn_mask=enc_mask.unsqueeze(-2)) 
@@ -88,11 +90,12 @@ class Transformer(nn.Module):
                                 d_v=dec_param.d_v, 
                                 dropout=dec_param.dropout, 
                                 scale_emb=dec_param.scale_emb)
-        
-        layers = []
-        for i in range(len(fc_list)-1):
-            layers.append(nn.Linear(fc_list[i], fc_list[i+1]))
-        self.fcs = nn.Sequential(*layers)
+        self.fcs = None
+        if len(fc_list) > 0:
+            layers = []
+            for i in range(len(fc_list)-1):
+                layers.append(nn.Linear(fc_list[i], fc_list[i+1]))
+            self.fcs = nn.Sequential(*layers)
 
         for p in self.parameters():
             if p.dim() > 1:
@@ -104,8 +107,9 @@ class Transformer(nn.Module):
         # decoder output
         dec_output = self.decoder(enc_output, enc_mask, dec_input, dec_mask=dec_mask)
         # fully connected layers output
-        output = self.fcs(dec_output)        
+        if self.fcs != None:
+            dec_output = self.fcs(dec_output)      
         """if self.scale_prj:
             seq_logit *= self.d_model ** -0.5"""
 
-        return output#.view(-1, seq_logit.size(2))
+        return dec_output#.view(-1, seq_logit.size(2))

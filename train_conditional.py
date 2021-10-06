@@ -279,7 +279,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
         # save model for each 5 epochs
-        if e % 20 == 19:
+        if e % 10 == 9:
             save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
         print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes (" + str(elapse_mid/60) + " hours)")
@@ -305,10 +305,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    a = torch.tensor([[1,1,1,1,1],[2,2,2,2,2]])
-    print(a.size())
-    print(a.sum(1))
-    print(a.size())
+    a = a = torch.randn(2,4,8)
+    print(a)
+    print(a[:,-1:,:])
+    print(a[:,-1:,:].view(2,4,2))
 
     
     

@@ -34,8 +34,9 @@ def get_caption_vector(text_model, caption_without_punctuation, max_sentence_len
 # get a batch of noise vectors
 def get_noise_tensor(batch_size, noise_size):
     """batch_size x 24 x noise_size"""
-    noise_tensor = torch.randn((batch_size, 24, 3), dtype=torch.float32).repeat(1,1, int(noise_size/3))
-    return noise_tensor
+    #noise_tensor = torch.randn((batch_size, 24, 3), dtype=torch.float32).repeat(1,1, int(noise_size/3))
+    #return noise_tensor
+    return torch.tensor([[[1]*150]*24]*batch_size, dtype=torch.float32)
 
 def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
     print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\

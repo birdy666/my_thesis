@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-from models.transformer import Transformer
+from models.transformer import Transformer, Encoder
 from models.layers import PositionalEncoding, EncoderLayer, DecoderLayer
 from utils import get_noise_tensor
+import numpy as np
 
 
 
@@ -34,6 +35,8 @@ class Generator(nn.Module):
     def __init__(self, enc_param, dec_param, fc_list):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
+        self.fc = nn.Linear(150, 24*3, bias=False)
+
 
     def reg_output(self, output):
         norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
@@ -43,10 +46,13 @@ class Generator(nn.Module):
         return output
 
     def forward(self, input_text, input_mask, noise):
+        batch_size = input_text.size(0)
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
                                 dec_input=noise, 
-                                dec_mask=None)        
+                                dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
+                                #torch.tensor(np.array([[0]*24]*128)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
+        output = self.fc(output[:,:1,:]).view(batch_size, 24, 3)
         return self.reg_output(output)
 
 class Discriminator(nn.Module):
@@ -66,7 +72,7 @@ class Discriminator(nn.Module):
                                 enc_mask=input_mask, 
                                 dec_input=rot_vec.repeat(1,1,50), 
                                 dec_mask=None)
-        return output
+        return output[:,-1:,:]
 
 
 if __name__ == "__main__":
