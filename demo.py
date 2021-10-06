@@ -2,6 +2,7 @@ import json
 import copy
 import torch
 from models.model_gan import Generator
+from models.transformer import Transformer, Encoder, Decoder
 from config import cfg
 from utils import get_noise_tensor, get_caption_vector
 import string
@@ -24,7 +25,7 @@ if __name__ == "__main__":
     """text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)
     fasttext.util.reduce_model(text_model, 150)"""
     
-    with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
+    with open('../eft/eft_fit/COCO2014-All-ver01.json','r') as f: # in docker
     #with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
         eft_all_with_caption = json.load(f)
     with open('./demo/vector.json','r') as f:

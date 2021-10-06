@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import numpy as np
 
 from models.transformer import Transformer, Encoder
 from models.layers import PositionalEncoding, EncoderLayer, DecoderLayer
@@ -10,9 +11,10 @@ import numpy as np
 
 
 
-def getModels(cfg, device, checkpoint=None):
+def getModels(cfg, device, checkpoint=None):  
     net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G).to(device)
     net_d = Discriminator(cfg.ENC_PARAM_D, cfg.DEC_PARAM_D, cfg.FC_LIST_D).to(device)
+
     if checkpoint != None:
         print("Start from epoch " + str(cfg.START_FROM_EPOCH))        
         net_g.load_state_dict(checkpoint['model_g'])        
@@ -32,7 +34,7 @@ def init_weight(m):
 
 # basically Encoder
 class Generator(nn.Module):
-    def __init__(self, enc_param, dec_param, fc_list):
+    def __init__(self, encoder, decoder, fc_list):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
         self.fc = nn.Linear(150, 24*3, bias=False)
@@ -56,16 +58,9 @@ class Generator(nn.Module):
         return self.reg_output(output)
 
 class Discriminator(nn.Module):
-    def __init__(self, enc_param, dec_param, fc_list):
+    def __init__(self, encoder, decoder, fc_list):
         super().__init__()
-        self.transformer = Transformer(enc_param, dec_param, fc_list)
-
-    def reg_output(self, output):
-        norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
-        # if the norm is smaller than pi than set it to pi, else dont change
-        norm = torch.clamp(norm, 2*math.pi, math.inf) 
-        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (2*math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)
-        return output
+        self.transformer = Transformer(encoder, decoder, fc_list)
         
     def forward(self, input_text, input_mask, rot_vec):
         output = self.transformer(enc_input=input_text, 
@@ -76,6 +71,5 @@ class Discriminator(nn.Module):
 
 
 if __name__ == "__main__":
-    a = nn.ModuleList([nn.Dropout()  for i in range(5)])
-
-    print(a[0])
+    a = torch.tensor([0]*3)
+    print()

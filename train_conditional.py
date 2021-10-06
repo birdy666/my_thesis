@@ -22,6 +22,7 @@ algorithm = 'wgan-gp'
 # weight clipping (WGAN)
 c = 0.01
 
+
 def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, text_match_mask, text_mismatch, text_mismatch_mask):  
     epsilon = torch.rand(batch_size, dtype=torch.float32).to(device)  
     ##########################
@@ -78,7 +79,6 @@ def get_d_score(so3_real, so3_d):
     # (batch, 24) ==(mean)==> (512)
     """norm = torch.norm(so3_d-so3_real, p=2, dim=-1, keepdim=False).mean(1)    
     return -torch.log(norm).mean()"""
-    """return -torch.norm(so3_d-so3_real, p=2, dim=-1, keepdim=False).mean()"""
     return so3_d.mean()
 
 def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True):
@@ -166,7 +166,7 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         score_fake = get_d_score(so3_real, so3_fake_d)
         # so3 interpolated
         so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
-        so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated)
+        so3_interpolated_d = net_d(text_interpolated, text_interpolated_mask, so3_interpolated)
         score_interpolated = get_d_score(so3_real, so3_interpolated_d)
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
@@ -181,7 +181,7 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
             score_fake = get_d_score(so3_real, so3_fake_d)
             # so3 interpolated
             so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
-            so3_interpolated_d = net_d(text_match, text_match_mask, so3_interpolated).detach()
+            so3_interpolated_d = net_d(text_interpolated, text_interpolated_mask, so3_interpolated).detach()
             score_interpolated = get_d_score(so3_real, so3_interpolated_d)
     
         
@@ -215,7 +215,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         if (i+1) % cfg.N_train_D_1_train_G == 0:
             # to avoid computation of net d
             """ for p in net_d.parameters():
-                p.requires_grad = False"""
+                p.requires_grad = False"""           
             #get losses
             score_fake, score_interpolated = get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
             loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G * score_interpolated)
