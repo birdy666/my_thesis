@@ -48,7 +48,7 @@ def getData(cfg):
     # load eft data
     eft_data_all = getEFTCaption(cfg)        
     # get the dataset (single person, with captions)
-    train_size = int(len(eft_data_all)*0.2*0.3*0.1)
+    train_size = int(len(eft_data_all)*0.2)
     print("dataset size: ", train_size)
     print("Creating dataset_train")
     dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint, text_model=text_model)
@@ -71,7 +71,7 @@ class TheDataset(torch.utils.data.Dataset):
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             # 每個cation都創一個資料
             for j, caption_ann in enumerate(captions_anns):
-                if j > 3:
+                if j > 2:
                     break
                 data = {'caption': caption_ann['caption'],
                         'parm_pose': eft_data_all[i]['parm_pose'],
@@ -137,14 +137,20 @@ if __name__ == "__main__":
         caption_ids = coco_caption.getAnnIds(imgIds=imgid)
         captions = coco_caption.loadAnns(ids=caption_ids)
         print(captions)"""
-    coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
-    eft_data_all = getEFTCaption(cfg)        
-    for i in range(10):
-        print("=======================================================")
+    #coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
+    #coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
+    eft_data_all = getEFTCaption(cfg)  
+    min_list = []
+    max_list = []      
+    for i in range(100):
+        """print("=======================================================")
         print(str(i))
-        print("=======================================================")
-        # 一筆eft資料只有一筆img_id
+        print("=======================================================")"""
+        so3 = np.array([rotation2so3(R) for R in eft_data_all[i]['parm_pose']])
+        norm = np.linalg.norm(so3, axis=1)
+        min_list.append(min(norm))
+        max_list.append(max(norm))
+        """# 一筆eft資料只有一筆img_id
         img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
         # 但對於同一個圖片會有很多語意相同的captions
         caption_ids = coco_caption.getAnnIds(imgIds=img_id)
@@ -153,4 +159,7 @@ if __name__ == "__main__":
         for j, caption_ann in enumerate(captions_anns):
             if j > 3:
                     break
-            print(caption_ann['caption'])
+            print(caption_ann['caption'])"""
+        
+    print(min(min_list))
+    print(max(max_list))

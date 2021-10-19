@@ -34,7 +34,7 @@ def init_weight(m):
 
 # basically Encoder
 class Generator(nn.Module):
-    def __init__(self, encoder, decoder, fc_list):
+    def __init__(self, enc_param, dec_param, fc_list):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
         self.fc = nn.Linear(150, 24*3, bias=False)
@@ -43,8 +43,8 @@ class Generator(nn.Module):
     def reg_output(self, output):
         norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
         # if the norm is smaller than pi than set it to pi, else dont change
-        norm = torch.clamp(norm, 2*math.pi, math.inf) 
-        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (2*math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)
+        norm = torch.clamp(norm, math.pi, math.inf) 
+        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)
         return output
 
     def forward(self, input_text, input_mask, noise):
