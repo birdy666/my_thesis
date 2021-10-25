@@ -22,10 +22,10 @@ __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
 
 # training
-__C.N_train_D_1_train_G = 2 # train discriminator k times before training generator
+__C.N_train_D_1_train_G = 1 # train discriminator k times before training generator
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 1e-5
-__C.LEARNING_RATE_D = 5e-6
+__C.LEARNING_RATE_D = 1e-5
 __C.NOISE_SIZE = 150
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
@@ -34,13 +34,13 @@ __C.MAX_SENTENCE_LEN = __C.JOINT_NUM
 
 __C.D_WORD_VEC = 150
 
-w_d = 2.5
-f_d = 2.5
-r_d = 5
+w_d = 2
+f_d = 1
+r_d = 2
 
 
-f_g = 7
-i_g = 3
+f_g = 8
+i_g = 2
 
 __C.SCORE_WRONG_WEIGHT_D = w_d/(w_d+f_d+r_d)
 __C.SCORE_FAKE_WEIGHT_D = f_d/(w_d+f_d+r_d)
@@ -52,17 +52,17 @@ __C.SCORE_INTERPOLATE_WEIGHT_G = i_g/(f_g+i_g)
 
 # Model g
 __C.ENC_PARAM_G = edict({'n_layers':7, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0, 'scale_emb':False})
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.DEC_PARAM_G = edict({'n_layers':1, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0, 'scale_emb':False})
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_G = []
 
 
 # Model d
-__C.ENC_PARAM_D = edict({'n_layers':3, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0, 'scale_emb':False})
-__C.DEC_PARAM_D = edict({'n_layers':5, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0, 'scale_emb':False})
+__C.ENC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
+__C.DEC_PARAM_D = edict({'n_layers':4, 'd_model':150, 'd_inner_scale':4, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_D = [150, 1]
 
 # OPtimizer

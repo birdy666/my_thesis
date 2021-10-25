@@ -37,14 +37,21 @@ class Generator(nn.Module):
     def __init__(self, enc_param, dec_param, fc_list):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
-        self.fc = nn.Linear(150, 24*3, bias=False)
+        self.fc = nn.Linear(150, 24*4, bias=False)
 
 
     def reg_output(self, output):
-        norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
+        """norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
         # if the norm is smaller than pi than set it to pi, else dont change
         norm = torch.clamp(norm, math.pi, math.inf) 
-        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)
+        output = torch.div(output, norm.unsqueeze(-1).repeat(1,1,3)) * (math.pi) # unsqueeze ==> (batch, 24, 1), repeat ==> (batch, 24, 3)"""
+        """norm = torch.norm(output, p=2, dim=-1, keepdim=False) # (batch, 24)
+        remainder = norm % math.pi + 0.00000001
+        scale = torch.div(remainder, norm).unsqueeze(-1).repeat(1,1,3)
+        output = output * scale"""
+        norm = torch.norm(output[:,:,:-1], p=2, dim=-1, keepdim=False).unsqueeze(-1)
+        scale = torch.clamp(output[:,:,-1:], 0, math.pi)  
+        output = output[:,:,:-1] * torch.div(scale, norm).repeat(1,1,3)
         return output
 
     def forward(self, input_text, input_mask, noise):
@@ -54,7 +61,7 @@ class Generator(nn.Module):
                                 dec_input=noise, 
                                 dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
                                 #torch.tensor(np.array([[0]*24]*128)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
-        output = self.fc(output[:,:1,:]).view(batch_size, 24, 3)
+        output = self.fc(output[:,:1,:]).view(batch_size, 24, 4)
         return self.reg_output(output)
 
 class Discriminator(nn.Module):
@@ -67,7 +74,7 @@ class Discriminator(nn.Module):
                                 enc_mask=input_mask, 
                                 dec_input=rot_vec.repeat(1,1,50), 
                                 dec_mask=None)
-        return output[:,-1:,:]
+        return output[:,-1:,:].mean()
 
 
 if __name__ == "__main__":

@@ -142,7 +142,7 @@ if __name__ == "__main__":
     eft_data_all = getEFTCaption(cfg)  
     min_list = []
     max_list = []      
-    for i in range(100):
+    for i in range(1000):
         """print("=======================================================")
         print(str(i))
         print("=======================================================")"""

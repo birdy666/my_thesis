@@ -39,8 +39,7 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
     so3_interpolated  = epsilon * so3_real + ((1 - epsilon) * so3_fake)"""
     so3_interpolated = Variable(so3_interpolated, requires_grad=True)    
     # calculate gradient penalty
-    so3_interpolated_so3_d = net_d(text_match, text_match_mask, so3_interpolated)
-    score_interpolated_fake = get_d_score(so3_real, so3_interpolated_so3_d)
+    score_interpolated_fake = net_d(text_match, text_match_mask, so3_interpolated)
     gradient_fake = grad(outputs=score_interpolated_fake, 
                     inputs=so3_interpolated, 
                     grad_outputs=torch.ones_like(score_interpolated_fake, requires_grad=False).to(device),
@@ -61,8 +60,7 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
     for i in range(batch_size):
         text_interpolated_mask[i] = f_mask(text_match_mask[0], text_mismatch_mask[0])
 
-    so3_interpolated_text_d = net_d(text_interpolated, text_interpolated_mask, so3_real)
-    score_interpolated_wrong = get_d_score(so3_real, so3_interpolated_text_d)
+    score_interpolated_wrong = net_d(text_interpolated, text_interpolated_mask, so3_real)
     gradient_wrong = grad(outputs=score_interpolated_wrong, 
                     inputs=text_interpolated, 
                     grad_outputs=torch.ones_like(score_interpolated_wrong).to(device),
@@ -94,27 +92,21 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     if update_d:
         # ground truth
-        so3_real_d = net_d(text_match, text_match_mask, so3_real)
-        score_right = get_d_score(so3_real, so3_real_d)
+        score_right = net_d(text_match, text_match_mask, so3_real)
         # tex mismatch
-        so3_wrong_d = net_d(text_mismatch, text_mismatch_mask, so3_real)
-        score_wrong = get_d_score(so3_real, so3_wrong_d)
+        score_wrong = net_d(text_mismatch, text_mismatch_mask, so3_real)
         # fake so3 by generator
         so3_fake = net_g(text_match, text_match_mask, noise).detach()
-        so3_fake_d = net_d(text_match, text_match_mask, so3_fake)
-        score_fake = get_d_score(so3_real, so3_fake_d)        
+        score_fake = net_d(text_match, text_match_mask, so3_fake)
     else:
         with torch.no_grad():
             # ground truth
-            so3_real_d = net_d(text_match, text_match_mask, so3_real).detach()
-            score_right = get_d_score(so3_real, so3_real_d)
+            score_right = net_d(text_match, text_match_mask, so3_real).detach()
             # tex mismatch
-            so3_wrong_d = net_d(text_mismatch, text_mismatch_mask, so3_real).detach()
-            score_wrong = get_d_score(so3_real, so3_wrong_d)
+            score_wrong = net_d(text_mismatch, text_mismatch_mask, so3_real).detach()
             # fake so3 by generator
             so3_fake = net_g(text_match, text_match_mask, noise).detach()
-            so3_fake_d = net_d(text_match, text_match_mask, so3_fake).detach()
-            score_fake = get_d_score(so3_real, so3_fake_d)    
+            score_fake = net_d(text_match, text_match_mask, so3_fake).detach()
 
     if algorithm == 'wgan':
         if update_d:
@@ -151,7 +143,6 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         net_g.zero_grad()
 
     # get text vectors and noises
-    so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
     text_interpolated = batch.get('vec_interpolated').to(device)
@@ -162,12 +153,10 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
     if update_g:
         # so3 fake
         so3_fake = net_g(text_match, text_match_mask, noise1)
-        so3_fake_d = net_d(text_match, text_match_mask, so3_fake)
-        score_fake = get_d_score(so3_real, so3_fake_d)
+        score_fake = net_d(text_match, text_match_mask, so3_fake)
         # so3 interpolated
         so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
-        so3_interpolated_d = net_d(text_interpolated, text_interpolated_mask, so3_interpolated)
-        score_interpolated = get_d_score(so3_real, so3_interpolated_d)
+        score_interpolated = net_d(text_interpolated, text_interpolated_mask, so3_interpolated)
         # 'wgan', 'wgan-gp' and 'wgan-lp'
         #so3_diff = torch.norm(so3_fake-so3_real, p=2, dim=-1, keepdim=False).mean()
         loss_g = - (cfg.SCORE_FAKE_WEIGHT_G * score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G * score_interpolated)
@@ -177,12 +166,10 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
         with torch.no_grad():            
             # so3 fake
             so3_fake = net_g(text_match, text_match_mask, noise1)
-            so3_fake_d = net_d(text_match, text_match_mask, so3_fake).detach()
-            score_fake = get_d_score(so3_real, so3_fake_d)
+            score_fake = net_d(text_match, text_match_mask, so3_fake).detach()
             # so3 interpolated
             so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
-            so3_interpolated_d = net_d(text_interpolated, text_interpolated_mask, so3_interpolated).detach()
-            score_interpolated = get_d_score(so3_real, so3_interpolated_d)
+            score_interpolated = net_d(text_interpolated, text_interpolated_mask, so3_interpolated).detach()
     
         
     return score_fake, score_interpolated
@@ -279,7 +266,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
         
         # save model for each 5 epochs
-        if e % 100 == 9:
+        if e % 20 == 9:
             save_models(cfg, e, net_g, net_d, optimizer_g.n_steps, optimizer_d.n_steps, cfg.CHKPT_PATH,  save_mode='all')
         elapse_mid=(time.time()-start_of_all_training)/60
         print('\n till episode ' + str(e) + ": " + str(elapse_mid) + " minutes (" + str(elapse_mid/60) + " hours)")
@@ -305,10 +292,16 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    a = a = torch.randn(2,4,8)
-    print(a)
-    print(a[:,-1:,:])
-    print(a[:,-1:,:].view(2,4,2))
+    a = torch.tensor([[[1,2,5,6],
+                        [2,6,8,4]],
+                        
+                       [[1,2,5,6],
+                        [2,6,8,4]] ])
+
+    
+    print(a.size())
+    print(a[:,:,:-1])
+    print(a[:,:,-1:])
 
     
     
