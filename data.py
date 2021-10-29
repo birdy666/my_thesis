@@ -43,12 +43,12 @@ def getData(cfg):
     # load text model
     print("Loading text model")
     text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)  
-    fasttext.util.reduce_model(text_model, 150)
+    fasttext.util.reduce_model(text_model, cfg.D_WORD_VEC)
     print("Text model loaded")
     # load eft data
     eft_data_all = getEFTCaption(cfg)        
     # get the dataset (single person, with captions)
-    train_size = int(len(eft_data_all)*0.2)
+    train_size = int(len(eft_data_all)*0.2*0.01)
     print("dataset size: ", train_size)
     print("Creating dataset_train")
     dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint, text_model=text_model)

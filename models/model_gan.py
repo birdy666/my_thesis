@@ -37,7 +37,7 @@ class Generator(nn.Module):
     def __init__(self, enc_param, dec_param, fc_list):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
-        self.fc = nn.Linear(150, 24*4, bias=False)
+        self.fc = nn.Linear(150, 24*3, bias=False)
 
 
     def reg_output(self, output):
@@ -50,7 +50,7 @@ class Generator(nn.Module):
         scale = torch.div(remainder, norm).unsqueeze(-1).repeat(1,1,3)
         output = output * scale"""
         norm = torch.norm(output[:,:,:-1], p=2, dim=-1, keepdim=False).unsqueeze(-1)
-        scale = torch.clamp(output[:,:,-1:], 0, math.pi)  
+        scale = F.hardtanh(output[:,:,-1:], min_val=0, max_val=math.pi)  
         output = output[:,:,:-1] * torch.div(scale, norm).repeat(1,1,3)
         return output
 
@@ -61,8 +61,8 @@ class Generator(nn.Module):
                                 dec_input=noise, 
                                 dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
                                 #torch.tensor(np.array([[0]*24]*128)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
-        output = self.fc(output[:,:1,:]).view(batch_size, 24, 4)
-        return self.reg_output(output)
+        output = self.fc(output).view(batch_size, 24, 24, 3)
+        return output[:,:1,:,:].squeeze(1)
 
 class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, fc_list):
