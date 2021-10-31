@@ -125,7 +125,8 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
         
             loss_d = cfg.SCORE_FAKE_WEIGHT_D * score_fake + cfg.SCORE_WRONG_WEIGHT_D * score_wrong \
                     - cfg.SCORE_RIGHT_WEIGHT_D * score_right \
-                    + cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake + cfg.PENALTY_WEIGHT_WRONG * grad_penalty_wrong
+                    + cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake + cfg.PENALTY_WEIGHT_WRONG * grad_penalty_wrong \
+                    + (cfg.SCORE_RIGHT_WEIGHT_D * score_right - cfg.SCORE_FAKE_WEIGHT_D * score_fake)**2*0.1
             loss_d.backward()
             optimizer_d.step_and_update_lr()
         else:
@@ -199,7 +200,7 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, 
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
         # after training discriminator for N times, train gernerator for 1 time
-        if (i+1) % cfg.N_train_D_1_train_G == 0:
+        if i % cfg.N_train_D_1_train_G == 0:
             # to avoid computation of net d
             """ for p in net_d.parameters():
                 p.requires_grad = False"""           
