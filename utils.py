@@ -38,15 +38,15 @@ def get_noise_tensor(batch_size, noise_size):
     #return noise_tensor
     return torch.tensor([[[1]*noise_size]*24]*batch_size, dtype=torch.float32)
 
-def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
-    print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
+def print_performances(header, start_time, loss_g, loss_d_1, loss_d_2, e):
+    print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d_1: {loss_d_1:8.5f} %, loss_d_2: {loss_d_2:8.5f} %,  '\
             'elapse: {elapse:3.3f} min'.format(
                 e = e, header=f"({header})", loss_g=loss_g,
-                loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
+                loss_d_1=loss_d_1, loss_d_2=loss_d_2, elapse=(time.time()-start_time)/60))
 
-def save_models(cfg, e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
-    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(),
-                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d, 'cfg':cfg}
+def save_models(cfg, e, net_g, net_d_1, net_d_2, chkpt_path,  save_mode='all'):
+    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d_1': net_d_1.state_dict(), 'model_d_2': net_d_2.state_dict(), 
+                    'cfg':cfg}
 
     if save_mode == 'all':
         torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")

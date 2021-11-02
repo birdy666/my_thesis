@@ -13,7 +13,8 @@ import numpy as np
 
 def getModels(cfg, device, checkpoint=None):  
     net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G, cfg.D_WORD_VEC).to(device)
-    net_d = Discriminator(cfg.ENC_PARAM_D, cfg.DEC_PARAM_D, cfg.FC_LIST_D, cfg.D_WORD_VEC).to(device)
+    net_d_1 = Discriminator(cfg.ENC_PARAM_D_1, cfg.DEC_PARAM_D_1, cfg.FC_LIST_D_1, cfg.D_WORD_VEC).to(device)
+    net_d_2 = Discriminator(cfg.ENC_PARAM_D_2, cfg.DEC_PARAM_D_2, cfg.FC_LIST_D_2, cfg.D_WORD_VEC).to(device)
 
     if checkpoint != None:
         print("Start from epoch " + str(cfg.START_FROM_EPOCH))        
@@ -24,7 +25,7 @@ def getModels(cfg, device, checkpoint=None):
         #net_g.apply(init_weight)
         #net_d.apply(init_weight)
         print("Start a new training from epoch 0")
-    return net_g, net_d
+    return net_g, net_d_1, net_d_2
 
 
 def init_weight(m):
@@ -37,7 +38,7 @@ class Generator(nn.Module):
     def __init__(self, enc_param, dec_param, fc_list, d_vec):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
-        self.fc = nn.Linear(d_vec, 24*3, bias=False)
+        self.fc = nn.Linear(24*d_vec, 24*3, bias=False)
 
     def forward(self, input_text, input_mask, noise):
         batch_size = input_text.size(0)
@@ -46,8 +47,10 @@ class Generator(nn.Module):
                                 dec_input=noise, 
                                 dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
                                 #torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
-        output = self.fc(output).view(batch_size, 24, 24, 3)
-        return output[:,:1,:,:].squeeze(1)
+        #output = F.hardtanh(self.fc(output).view(batch_size, 24, 24, 3), min_val=-math.pi, max_val=math.pi)
+        output = F.hardtanh(self.fc(output.view(batch_size, -1)).view(batch_size,24,3), min_val=-math.pi, max_val=math.pi)  
+        #return output[:,:1,:,:].squeeze(1)
+        return output
 
 class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, fc_list, d_vec):
