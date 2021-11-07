@@ -27,7 +27,7 @@ def so32rotation(so3):
     Return the rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
     """
-    theta = math.sqrt(np.dot(so3, so3))
+    theta = min(math.pi, abs(math.sqrt(np.dot(so3, so3))))    
     axis = so3 / theta
     a = math.cos(theta / 2.0)
     b, c, d = -axis * math.sin(theta / 2.0)

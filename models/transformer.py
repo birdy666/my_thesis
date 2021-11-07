@@ -39,7 +39,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     ''' A decoder model with self attention mechanism. '''
-    def __init__(self, n_layers=4, d_model=150, d_inner_scale=4, n_head=8, 
+    def __init__(self, n_layers=4, d_model=150, d_inner_scale=2, n_head=8, 
                 d_k=32, d_v=32, dropout=0.1, scale_emb=False):
         super().__init__()
         #self.position_enc = PositionalEncoding(cfg.D_WORD_VEC+cfg.NOISE_SIZE, n_position=cfg.N_POSITION_G)

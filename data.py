@@ -63,15 +63,17 @@ class TheDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, eft_data_all, coco_caption, coco_keypoint, text_model=None, val=False):
         self.dataset = []
         self.cfg = cfg
-        for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):
-            # 一筆eft資料只有一筆img_id
+        previous_ids = []
+        for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):            
+            # 一筆eft資料對應到一張img中的一筆keypoint
             img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
+            
             # 但對於同一個圖片會有很多語意相同的captions
             caption_ids = coco_caption.getAnnIds(imgIds=img_id)
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             # 每個cation都創一個資料
             for j, caption_ann in enumerate(captions_anns):
-                if j > 2:
+                if j > 1:
                     break
                 data = {'caption': caption_ann['caption'],
                         'parm_pose': eft_data_all[i]['parm_pose'],

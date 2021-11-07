@@ -44,7 +44,7 @@ class Generator(nn.Module):
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
                                 dec_input=noise, 
-                                dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
+                                dec_mask=torch.tensor(np.array([[1]+[1]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
                                 #torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
         #output = F.hardtanh(self.fc(output).view(batch_size, 24, 24, 3), min_val=-math.pi, max_val=math.pi)
         output = F.hardtanh(self.fc(output.view(batch_size, -1)).view(batch_size,24,3), min_val=-math.pi, max_val=math.pi)  
@@ -55,14 +55,17 @@ class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, fc_list, d_vec):
         super().__init__()
         self.transformer = Transformer(encoder, decoder, fc_list)
+        self.fc = nn.Linear(24*d_vec, 24*1, bias=False)
         self.d_vec = d_vec
         
     def forward(self, input_text, input_mask, rot_vec):
+        batch_size = input_text.size(0)
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
                                 dec_input=rot_vec.repeat(1,1,self.d_vec//3), 
                                 dec_mask=None)
-        return output[:,-1:,:].mean()
+        output = self.fc(output.view(batch_size, -1))
+        return output
 
 
 if __name__ == "__main__":
