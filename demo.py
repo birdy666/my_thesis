@@ -14,7 +14,7 @@ import numpy as np
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_8000' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_6000' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
@@ -32,7 +32,7 @@ if __name__ == "__main__":
         eft_all_with_caption = json.load(f)
   
     eft_all_fake = eft_all_with_caption['data'] 
-    eft_all_fake = eft_all_fake[:50]
+    eft_all_fake = eft_all_fake[:200]
     print(len(eft_all_fake))
     net_g.eval()
     

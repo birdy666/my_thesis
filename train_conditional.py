@@ -263,9 +263,9 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
         print_performances('Training', start, train_loss_g, train_loss_d, lr_g, lr_d, e)
         
         # Validation!!
-        start = time.time()
+        """start = time.time()
         val_loss_g, val_loss_d = val_epoch(cfg, device, net_g, net_d, criterion, dataLoader_val)
-        print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)
+        print_performances('Validation', start, val_loss_g, val_loss_d, lr_g, lr_d, e)"""
         
         # save model for each 5 epochs
         if e % cfg.SAVE_MODEL_ITR == 0 and e != 0:
@@ -281,8 +281,8 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
                 epoch=e, loss_g=val_loss_g, loss_d=val_loss_d))"""
 
         if cfg.USE_TENSORBOARD:
-            tb_writer.add_scalars('loss_g', {'train': train_loss_g, 'val': val_loss_g}, e)
-            tb_writer.add_scalars('loss_d', {'train': train_loss_d, 'val': val_loss_d}, e)
+            tb_writer.add_scalars('loss_g', {'train': train_loss_g, 'val': 0}, e)
+            tb_writer.add_scalars('loss_d', {'train': train_loss_d, 'val': 0}, e)
             """tb_writer.add_scalar('loss_g', train_loss_g, e)
             tb_writer.add_scalar('loss_d', train_loss_d, e)"""
             """tb_writer.add_scalar('learning_rate_g', lr_g, e)
