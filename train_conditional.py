@@ -77,11 +77,11 @@ def get_d_score(so3_real, so3_d):
     return so3_d.mean()
 
 def get_g_so3(output, gg = False):
-    """norm = torch.norm(output[:,:,:-1].clone().detach(), p=2, dim=-1, keepdim=False).unsqueeze(-1)+0.0000000001
+    norm = torch.norm(output[:,:,:-1].clone().detach(), p=2, dim=-1, keepdim=False).unsqueeze(-1)+0.0000000001
     scale = F.hardtanh(output[:,:,-1:], min_val=-math.pi/2.0, max_val=math.pi/2.0) +  math.pi/2.0 + 0.0000000001
     newOut = output[:,:,:-1] * scale.repeat(1,1,3)
-    newOut = torch.div(newOut, norm.repeat(1,1,3))"""
-    return output
+    newOut = torch.div(newOut, norm.repeat(1,1,3))
+    return newOut
 
 def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True):
     if update_d:

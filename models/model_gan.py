@@ -78,6 +78,7 @@ class Generator(nn.Module):
         #output = self.conv(output.view(batch_size,24*4,self.d_vec//4)).view(batch_size,24,4)
         output = self.dropout(self.fc(output))
         return  F.hardtanh(output, min_val=-math.pi+0.0000000001, max_val=math.pi-0.0000000001) 
+
 class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, fc_list, d_vec):
         super().__init__()
@@ -90,7 +91,7 @@ class Discriminator(nn.Module):
         batch_size = input_text.size(0)
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
-                                dec_input=rot_vec.view(batch_size, 1, 24*4).repeat(1,24,1), 
+                                dec_input=rot_vec.view(batch_size, 1, 24*3).repeat(1,24,1), 
                                 dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
         #output = self.dropout(self.fc(output.view(batch_size, -1)))
         return output[:,:1,:].sum(-1)
