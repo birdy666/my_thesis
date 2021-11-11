@@ -11,7 +11,7 @@ from tqdm import tqdm
 import string
 
 
-from geometry import rotation2so3
+from geometry import rotation2so3, rotation2AxisAngle
 from utils import get_noise_tensor, get_caption_vector
 from config import cfg
 
@@ -48,7 +48,7 @@ def getData(cfg):
     # load eft data
     eft_data_all = getEFTCaption(cfg)        
     # get the dataset (single person, with captions)
-    train_size = int(len(eft_data_all)*0.2*0.1)
+    train_size = int(len(eft_data_all))
     print("dataset size: ", train_size)
     print("Creating dataset_train")
     dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint, text_model=text_model)
@@ -63,17 +63,20 @@ class TheDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, eft_data_all, coco_caption, coco_keypoint, text_model=None, val=False):
         self.dataset = []
         self.cfg = cfg
-        previous_ids = []
+        previous_img_ids = []
         for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):            
             # 一筆eft資料對應到一張img中的一筆keypoint
             img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
-            
+            if img_id in previous_img_ids:
+                continue
+            else:
+                previous_img_ids.append(img_id)
             # 但對於同一個圖片會有很多語意相同的captions
             caption_ids = coco_caption.getAnnIds(imgIds=img_id)
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             # 每個cation都創一個資料
             for j, caption_ann in enumerate(captions_anns):
-                if j > 1:
+                if j > 0:
                     break
                 data = {'caption': caption_ann['caption'],
                         'parm_pose': eft_data_all[i]['parm_pose'],
@@ -81,7 +84,7 @@ class TheDataset(torch.utils.data.Dataset):
                         'smpltype': eft_data_all[i]['smpltype'],
                         'annotId': eft_data_all[i]['annotId'],
                         'imageName': eft_data_all[i]['imageName']}
-                data['so3'] = np.array([rotation2so3(R) for R in data['parm_pose']])
+                data['so3'] = np.array([self.get_AxisAngle(R) for R in data['parm_pose']])
                 # add sentence encoding
                 if text_model is not None:
                     caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
@@ -105,6 +108,10 @@ class TheDataset(torch.utils.data.Dataset):
         item['vec_interpolated'], item['vec_interpolated_mask'] = self.get_interpolated_text(0.5)
             
         return item
+    
+    def get_AxisAngle(self, R):
+        axis, angle = rotation2AxisAngle(R)
+        return np.append(axis, angle)
 
     # get a batch of random caption sentence vectors from the whole dataset
     def get_text_mismatch(self, index):
