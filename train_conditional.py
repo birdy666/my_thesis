@@ -1,5 +1,8 @@
 from math import nan
 import random
+import torch
+import torch.nn.functional as F
+import math
 import time
 from torch.autograd import grad
 import torch
@@ -11,12 +14,6 @@ from utils import get_noise_tensor, print_performances, save_models
 
 from torch.autograd import Variable
 
-
-# algorithms: gan, wgan, wgan-gp, wgan-lp
-# gan: k = 1, beta_1 = 0.5, beta_2 = 0.999, lr = 0.0001, epoch = 50~300
-# wgan: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.001, c = 0.01, epoch = 200~1200
-# wgan-gp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 20, epoch = 200~1200
-# wgan-lp: k = 5, beta_1 = 0, beta_2 = 0.9, lr = 0.0004, lamb = 150, epoch = 200~1200
 algorithm = 'wgan-gp'
 
 # weight clipping (WGAN)
@@ -79,6 +76,13 @@ def get_d_score(so3_real, so3_d):
     return -torch.log(norm).mean()"""
     return so3_d.mean()
 
+def get_g_so3(output, gg = False):
+    """norm = torch.norm(output[:,:,:-1].clone().detach(), p=2, dim=-1, keepdim=False).unsqueeze(-1)+0.0000000001
+    scale = F.hardtanh(output[:,:,-1:], min_val=-math.pi/2.0, max_val=math.pi/2.0) +  math.pi/2.0 + 0.0000000001
+    newOut = output[:,:,:-1] * scale.repeat(1,1,3)
+    newOut = torch.div(newOut, norm.repeat(1,1,3))"""
+    return output
+
 def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True):
     if update_d:
         net_d.zero_grad()
@@ -96,7 +100,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
         # tex mismatch
         score_wrong = get_d_score(so3_real, net_d(text_mismatch, text_mismatch_mask, so3_real))
         # fake so3 by generator
-        so3_fake = net_g(text_match, text_match_mask, noise).detach()
+        so3_fake = get_g_so3(net_g(text_match, text_match_mask, noise).detach())
         score_fake = get_d_score(so3_real, net_d(text_match, text_match_mask, so3_fake))
     else:
         with torch.no_grad():
@@ -105,7 +109,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
             # tex mismatch
             score_wrong = net_d(text_mismatch, text_mismatch_mask, so3_real).detach()
             # fake so3 by generator
-            so3_fake = net_g(text_match, text_match_mask, noise).detach()
+            so3_fake = get_g_so3(net_g(text_match, text_match_mask, noise).detach())
             score_fake = net_d(text_match, text_match_mask, so3_fake).detach()
 
     if algorithm == 'wgan':
@@ -154,7 +158,8 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
 
     if update_g:
         # so3 fake
-        so3_fake = net_g(text_match, text_match_mask, noise1)
+        output = net_g(text_match, text_match_mask, noise1)
+        so3_fake = get_g_so3(output, gg=True)
         score_fake = get_d_score(so3_real, net_d(text_match, text_match_mask, so3_fake))
         # so3 interpolated
         """so3_interpolated = net_g(text_interpolated, text_interpolated_mask, noise2)
@@ -294,21 +299,16 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    a = torch.tensor([[[1,2,5,6],
-                        [2,6,8,4]],
-                        
-                       [[1,2,5,6],
-                        [2,6,8,4]] ])
+    a = torch.tensor([[[1,1,1]],                        
+                       [[2,2,2]] ])
 
-    
-    print(a.size())
-    print(a[:,:1,:])
-    print(a[:,:1,:].squeeze(1))
+    b = torch.tensor([[[1,1,1,1],[1,1,1,1],[1,1,1,1]],                        
+                       [[2,2,2,2],[2,2,2,2],[2,2,2,2]] ])
 
-    a = [1,2,3,4,5,6]
-    print(1 in a)
-    print(7 in a)
+    c =torch.tensor([[[1,1,1]],                        
+                       [[2,2,2]] ])
 
-
+    c = [1,2,3,4,5]
+    print(6 in c)
     
     

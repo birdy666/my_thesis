@@ -16,26 +16,26 @@ cfg = __C
 __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
-__C.START_FROM_EPOCH = 0#200
+__C.START_FROM_EPOCH = 141#200
 __C.END_IN_EPOCH = 20000#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
-__C.SAVE_MODEL_ITR = 500
+__C.SAVE_MODEL_ITR = 20
 
 # training
-__C.N_train_D_1_train_G = 2# train discriminator k times before training generator
+__C.N_train_D_1_train_G = 1# train discriminator k times before training generator
 __C.BATCH_SIZE = 128*1
 __C.LEARNING_RATE_G = 2e-5
 __C.LEARNING_RATE_D = 2e-5
 __C.WEIGHT_DECAY_G = 0
-__C.WEIGHT_DECAY_D = 0.01
+__C.WEIGHT_DECAY_D = 0.001
 
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 8
 __C.JOINT_NUM = 24
 __C.MAX_SENTENCE_LEN = __C.JOINT_NUM
 
-__C.D_WORD_VEC = 72
+__C.D_WORD_VEC = 96
 __C.NOISE_SIZE = __C.D_WORD_VEC
 
 w_d = 1
@@ -43,8 +43,8 @@ f_d = 1
 r_d = 2
 
 
-f_g = 8
-i_g = 2
+f_g = 1
+i_g = 0
 
 __C.SCORE_WRONG_WEIGHT_D = w_d/(w_d+f_d+r_d)
 __C.SCORE_FAKE_WEIGHT_D = f_d/(w_d+f_d+r_d)
@@ -57,7 +57,7 @@ __C.SCORE_INTERPOLATE_WEIGHT_G = i_g/(f_g+i_g)
 # Model g
 __C.ENC_PARAM_G = edict({'n_layers':8, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.DEC_PARAM_G = edict({'n_layers':2, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
+__C.DEC_PARAM_G = edict({'n_layers':8, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
 __C.FC_LIST_G = []
 __C.DROPOUT_G = 0.2
