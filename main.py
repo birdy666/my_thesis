@@ -14,7 +14,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if __name__ == "__main__":
     checkpoint = None
     if cfg.START_FROM_EPOCH > 0:
-        checkpoint = torch.load(cfg.CHKPT_PATH + "/epoch_" + str(cfg.START_FROM_EPOCH-1) + ".chkpt")
+        checkpoint = torch.load(cfg.CHKPT_PATH + "/epoch_" + str(cfg.START_FROM_EPOCH-1) + ".chkpt", map_location='cpu')
     text_model, eft_all_with_caption, dataset_train, dataset_val = getData(cfg)    
     net_g, net_d = getModels(cfg, device, checkpoint) 
 
