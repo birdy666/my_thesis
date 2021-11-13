@@ -59,9 +59,8 @@ class Generator(nn.Module):
     def __init__(self, enc_param, dec_param, fc_list, d_vec):
         super().__init__()
         self.transformer = Transformer(enc_param, dec_param, fc_list)
-        self.fc = LinearWithChannel(d_vec, 4, 24)
+        self.fc = LinearWithChannel(d_vec, 3, 24)
         self.dropout = nn.Dropout(0.05)
-        self.conv=nn.Conv1d(in_channels=24*4,out_channels=24*4,kernel_size=d_vec//4,groups=24*4)
         self.d_vec = d_vec
 
     def forward(self, input_text, input_mask, noise):
@@ -83,18 +82,19 @@ class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, fc_list, d_vec):
         super().__init__()
         self.transformer = Transformer(encoder, decoder, fc_list)
-        self.fc = nn.Linear(24*d_vec, 24*1, bias=False)
-        self.dropout = nn.Dropout(0.2)
+        #self.fc = nn.Linear(24*d_vec, 24*1, bias=False)
+        #self.dropout = nn.Dropout(0.2)
         self.d_vec = d_vec        
         
     def forward(self, input_text, input_mask, rot_vec):
         batch_size = input_text.size(0)
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
-                                dec_input=rot_vec.view(batch_size, 1, 24*3).repeat(1,24,1), 
-                                dec_mask=torch.tensor(np.array([[1]+[0]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
+                                dec_input=rot_vec.repeat(1,1,self.d_vec//3), 
+                                dec_mask=torch.tensor(np.array([[1]+[1]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
         #output = self.dropout(self.fc(output.view(batch_size, -1)))
-        return output[:,:1,:].sum(-1)
+        gg = F.relu((rot_vec*rot_vec).sum(-1)-math.pi**2)
+        return output.sum() - 100*gg.sum()
 
 
 if __name__ == "__main__":

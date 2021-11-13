@@ -16,31 +16,31 @@ cfg = __C
 __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
-__C.START_FROM_EPOCH = 141#200
+__C.START_FROM_EPOCH = 0#200
 __C.END_IN_EPOCH = 20000#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
-__C.SAVE_MODEL_ITR = 20
+__C.SAVE_MODEL_ITR = 40
 
 # training
-__C.N_train_D_1_train_G = 1# train discriminator k times before training generator
-__C.BATCH_SIZE = 128*1
-__C.LEARNING_RATE_G = 2e-5
-__C.LEARNING_RATE_D = 2e-5
+__C.N_train_D_1_train_G = 4# train discriminator k times before training generator
+__C.BATCH_SIZE = 128
+__C.LEARNING_RATE_G = 1e-4
+__C.LEARNING_RATE_D = 1e-4
 __C.WEIGHT_DECAY_G = 0
-__C.WEIGHT_DECAY_D = 0.001
+__C.WEIGHT_DECAY_D = 0
 
 __C.COMPRESS_SIZE = 128
-__C.WORKERS = 8
+__C.WORKERS = 2
 __C.JOINT_NUM = 24
 __C.MAX_SENTENCE_LEN = __C.JOINT_NUM
 
-__C.D_WORD_VEC = 72
+__C.D_WORD_VEC = 150
 __C.NOISE_SIZE = __C.D_WORD_VEC
 
 w_d = 1
 f_d = 1
-r_d = 2
+r_d = w_d + f_d
 
 
 f_g = 1
@@ -49,32 +49,32 @@ i_g = 0
 __C.SCORE_WRONG_WEIGHT_D = w_d/(w_d+f_d+r_d)
 __C.SCORE_FAKE_WEIGHT_D = f_d/(w_d+f_d+r_d)
 __C.SCORE_RIGHT_WEIGHT_D = r_d/(w_d+f_d+r_d)
-__C.PENALTY_WEIGHT_WRONG = 1
-__C.PENALTY_WEIGHT_FAKE = 1
+__C.PENALTY_WEIGHT_WRONG = 0
+__C.PENALTY_WEIGHT_FAKE = 5
 __C.SCORE_FAKE_WEIGHT_G = f_g/(f_g+i_g)
 __C.SCORE_INTERPOLATE_WEIGHT_G = i_g/(f_g+i_g)
 
 # Model g
-__C.ENC_PARAM_G = edict({'n_layers':8, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
+__C.ENC_PARAM_G = edict({'n_layers':5, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':3, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.DEC_PARAM_G = edict({'n_layers':8, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
+__C.DEC_PARAM_G = edict({'n_layers':5, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':3, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_G = []
 __C.DROPOUT_G = 0.2
 
 
 # Model d
-__C.ENC_PARAM_D = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
+__C.ENC_PARAM_D = edict({'n_layers':5, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':2, 'n_head':4, 
                 'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
-__C.DEC_PARAM_D = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':4, 
-                'd_k':32, 'd_v':32, 'dropout':0.2, 'scale_emb':False})
+__C.DEC_PARAM_D = edict({'n_layers':5, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':2, 'n_head':4, 
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_D = []
 __C.DROPOUT_D = 0.2
 
 # OPtimizer
 # ADAM solver
-__C.BETA_1 = 0.9
-__C.BETA_2 = 0.999
+__C.BETA_1 = 0
+__C.BETA_2 = 0.9
 __C.N_WARMUP_STEPS_G = 2000
 __C.N_WARMUP_STEPS_D = 3000
 

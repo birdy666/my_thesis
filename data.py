@@ -11,7 +11,7 @@ from tqdm import tqdm
 import string
 
 
-from geometry import rotation2so3, rotation2AxisAngle
+from geometry import rotation2so3, rotation2AxisAngle, Rotation2Quaternion
 from utils import get_noise_tensor, get_caption_vector
 from config import cfg
 
@@ -42,8 +42,9 @@ def getData(cfg):
     coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
     # load text model
     print("Loading text model")
-    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH)  
-    fasttext.util.reduce_model(text_model, cfg.D_WORD_VEC)
+    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH) 
+    if  cfg.D_WORD_VEC < 300:
+        fasttext.util.reduce_model(text_model, cfg.D_WORD_VEC)
     print("Text model loaded")
     # load eft data
     eft_data_all = getEFTCaption(cfg)        
@@ -84,7 +85,7 @@ class TheDataset(torch.utils.data.Dataset):
                         'smpltype': eft_data_all[i]['smpltype'],
                         'annotId': eft_data_all[i]['annotId'],
                         'imageName': eft_data_all[i]['imageName']}
-                data['so3'] = np.array([self.get_AxisAngle(R) for R in data['parm_pose']])
+                data['so3'] = np.array([rotation2so3(R) for R in data['parm_pose']])
                 # add sentence encoding
                 if text_model is not None:
                     caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
@@ -109,10 +110,6 @@ class TheDataset(torch.utils.data.Dataset):
             
         return item
     
-    def get_AxisAngle(self, R):
-        axis, angle = rotation2AxisAngle(R)
-        return np.append(axis, angle)
-
     # get a batch of random caption sentence vectors from the whole dataset
     def get_text_mismatch(self, index):
         others = list(range(0, index)) + list(range(index+1, len(self.dataset)))

@@ -233,6 +233,6 @@ if __name__ == '__main__':
     #with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
     with open('./demo/eft_50.json','r') as f:
         eft_all_with_caption = json.load(f)
-        eft_all_with_caption = eft_all_with_caption[:150]
+        eft_all_with_caption = eft_all_with_caption[:50]
     visEFT_singleSubject(renderer,eft_all_with_caption)
 

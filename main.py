@@ -12,6 +12,8 @@ from models.model_gan import getModels
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == "__main__":
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     checkpoint = None
     if cfg.START_FROM_EPOCH > 0:
         checkpoint = torch.load(cfg.CHKPT_PATH + "/epoch_" + str(cfg.START_FROM_EPOCH-1) + ".chkpt", map_location='cpu')

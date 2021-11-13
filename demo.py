@@ -17,7 +17,7 @@ import math
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_24' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_340' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         eft_all_with_caption = json.load(f)
   
     eft_all_fake = eft_all_with_caption['data'] 
-    eft_all_fake = eft_all_fake[:10]
+    eft_all_fake = eft_all_fake[:50]
     print(len(eft_all_fake))
     net_g.eval()
     
@@ -67,19 +67,20 @@ if __name__ == "__main__":
                 text_match_mask = torch.tensor(data['vec_mask'], dtype=torch.int).unsqueeze(0)
                 noise = torch.randn((1, 24, cfg.D_WORD_VEC), dtype=torch.float32).to(device)
 
-                gg = net_g(text_match, text_match_mask, noise)
+                so3_fake = net_g(text_match, text_match_mask, noise)
+                """
                 norm = torch.norm(gg[:,:,:-1], p=2, dim=-1, keepdim=False).unsqueeze(-1)+0.0000000001
                 scale = F.hardtanh(gg[:,:,-1:], min_val=-math.pi/2.0 , max_val=math.pi/2.0) +  math.pi/2.0 + 0.0000000001
-                so3_fake = gg[:,:,:-1] * torch.div(scale, norm).repeat(1,1,3)
+                so3_fake = gg[:,:,:-1] * torch.div(scale, norm).repeat(1,1,3)"""
         
                 so3_fake = so3_fake[0].detach().numpy()
                 parm_pose = []
                 for j in range(len(so3_fake)):
                     parm_pose.append(so32rotation(so3_fake[j]))
                 
-                for j in range(len(eft_all_fake[i]['parm_pose'])):
+                """for j in range(len(eft_all_fake[i]['parm_pose'])):
                     print(rotation2so3(eft_all_fake[i]['parm_pose'][j]))
-                print("=================================")
+                print("=================================")"""
                 """v = []
                 for j in range(len(eft_all_fake[i]['parm_pose'])):
                     v.append(so32rotation(rotation2so3(eft_all_fake[i]['parm_pose'][j])))"""
