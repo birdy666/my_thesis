@@ -77,7 +77,7 @@ class TheDataset(torch.utils.data.Dataset):
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             # 每個cation都創一個資料
             for j, caption_ann in enumerate(captions_anns):
-                if j > 0:
+                if j > 1:
                     break
                 data = {'caption': caption_ann['caption'],
                         'parm_pose': eft_data_all[i]['parm_pose'],
