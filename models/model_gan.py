@@ -131,22 +131,26 @@ class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, fc_list, d_vec):
         super().__init__()
         self.transformer = Transformer(encoder, decoder, fc_list)
-        self.fc = LinearWithChannel(d_vec, 1, 24)
-        self.fc2 = nn.Linear(24, 1)
+        self.fc = LinearWithChannel(d_vec, d_vec//9, 24)
+        self.fc2 = nn.Linear(24*d_vec//9, 1)
         #self.fc = nn.Linear(d_vec, 1, 24)
         self.dropout = nn.Dropout(0.05)
         self.d_vec = d_vec        
         
     def forward(self, input_text, input_mask, rot_vec):
         batch_size = input_text.size(0)
+        noise_tensor = torch.randn((batch_size, 24, 3), dtype=torch.float32).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))        
+        rot_vec = rot_vec + 0.25*noise_tensor
         output = self.transformer(enc_input=input_text, 
                                 enc_mask=input_mask, 
                                 dec_input=rot_vec.view(batch_size, 1, -1).repeat(1,24,1), 
                                 dec_mask=torch.tensor(np.array([[1]+[1]*23]*batch_size)).to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
         #output = self.dropout(self.fc(output.view(batch_size, -1)))
-        output = self.fc2(self.dropout(self.fc(output)).view(batch_size, -1))
-        haha = F.relu((rot_vec*rot_vec).sum(-1)-math.pi**2)
-        return output.mean() - 100*haha.mean()
+        output = self.fc(self.dropout(output)).view(batch_size, -1)
+        output = self.fc2(output)
+        output = (output*output)
+        haha = F.relu((rot_vec*rot_vec).sum(-1)-(math.pi+0.01)**2)
+        return output.mean()
 
 
 if __name__ == "__main__":

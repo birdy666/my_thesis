@@ -89,12 +89,12 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
         net_d.zero_grad()
 
     # get so3, text vectors and noises
-    noise_tensor1 = torch.randn((cfg.BATCH_SIZE, 24, 3), dtype=torch.float32)
-    so3_real = (batch.get('so3')+0.2*noise_tensor1).to(device) # torch.Size([128, 24, 3])
+    so3_real = batch.get('so3').to(device) # torch.Size([128, 24, 3])
+    so3_wrong = batch.get('so3_wrong').to(device)
     text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
     text_match_mask = batch.get('vec_mask').to(device)
     text_mismatch = batch.get('vec_mismatch').to(device)
-    text_mismatch_mask = batch.get('vec_mismatch_mask').to(device)
+    text_mismatch_mask = batch.get('vec_mismatch_mask').to(device)    
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     grad_penalty_fake = 0
     grad_penalty_wrong = 0
@@ -102,7 +102,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
         # ground truth
         score_right = get_d_score(so3_real, net_d(text_match, text_match_mask, so3_real))
         # tex mismatch
-        score_wrong = get_d_score(so3_real, net_d(text_mismatch, text_mismatch_mask, so3_real))
+        score_wrong = get_d_score(so3_real, net_d(text_match, text_match_mask, so3_wrong))
         # fake so3 by generator
         so3_fake = get_g_so3(net_g(text_match, text_match_mask, noise).detach())
         score_fake = get_d_score(so3_real, net_d(text_match, text_match_mask, so3_fake))
@@ -305,8 +305,8 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLo
 
 
 if __name__ == "__main__":
-    a = torch.tensor([[[1,1,1]],                        
-                       [[2,2,2]] ])
+    a = torch.tensor([[[1,-3,1]],                        
+                       [[-2,2,-2]] ])
     aa = torch.tensor([[[2,2,2]],                        
                        [[2,2,2]] ])
 
@@ -315,9 +315,9 @@ if __name__ == "__main__":
 
     c =torch.tensor([[[1,1,1]],                        
                        [[2,2,2]] ])
-
+    k = np.array([[1,1,-1],[2,-2,2]])
     c = [1,2,3,4,5]
     print(6 in c)
-    print(torch.randn(30))
+    print((k*k).sum(-1)-5)
     
     

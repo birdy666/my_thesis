@@ -17,7 +17,7 @@ import math
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_40' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_50' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         eft_all_with_caption = json.load(f)
   
     eft_all_fake = eft_all_with_caption['data'] 
-    eft_all_fake = eft_all_fake[:50]
+    eft_all_fake = eft_all_fake[:400]
     print(len(eft_all_fake))
     net_g.eval()
     
@@ -50,7 +50,10 @@ if __name__ == "__main__":
         #text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
         #text_match_mask = batch.get('vec_mask').to(device)
         img_id = coco_keypoint.loadAnns(eft_all_fake[i]['annotId'])[0]['image_id']
-        
+        if img_id in previous_ids:
+            continue
+        else:
+            previous_ids.append(img_id)
         # 但對於同一個圖片會有很多語意相同的captions
         caption_ids = coco_caption.getAnnIds(imgIds=img_id)
         captions_anns = coco_caption.loadAnns(ids=caption_ids)
@@ -58,10 +61,10 @@ if __name__ == "__main__":
         for j, captions_ann in enumerate(captions_anns):
             if j > 0:
                 break        
-            print(captions_ann['caption'])
+            print(str(i) + ": " +captions_ann['caption'])
             caption_without_punctuation = ''.join([j for j in captions_ann['caption'] if j not in string.punctuation])
             if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
-                data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN, cfg.D_WORD_VEC)
+                data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.JOINT_NUM, cfg.D_WORD_VEC)
 
                 text_match = torch.tensor(data['vector'], dtype=torch.float32).unsqueeze(0)
                 text_match_mask = torch.tensor(data['vec_mask'], dtype=torch.int).unsqueeze(0)

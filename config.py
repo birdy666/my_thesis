@@ -5,7 +5,6 @@ import os.path as osp
 import numpy as np
 from easydict import EasyDict as edict
 import os
-from torch.utils.tensorboard import SummaryWriter
 
 project_dir = os.path.dirname(__file__) # /media/remote_home/chang/z_master-thesis
 my_dir = os.path.dirname(project_dir) # /media/remote_home/chang
@@ -17,30 +16,30 @@ __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
 __C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 200#1200
+__C.END_IN_EPOCH = 500#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
-__C.SAVE_MODEL_ITR = 10
+__C.SAVE_MODEL_ITR = 20
 
 # training
 __C.N_train_D_1_train_G = 10# train discriminator k times before training generator
 __C.BATCH_SIZE = 128
-__C.LEARNING_RATE_G = 4e-5
-__C.LEARNING_RATE_D = 4e-5
+__C.LEARNING_RATE_G = 1e-5
+__C.LEARNING_RATE_D = 1e-5
 __C.WEIGHT_DECAY_G = 0
-__C.WEIGHT_DECAY_D = 0
+__C.WEIGHT_DECAY_D = 0.01
 
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 2
 __C.JOINT_NUM = 24
-__C.MAX_SENTENCE_LEN = __C.JOINT_NUM
+__C.MAX_SENTENCE_LEN = 12
 
 __C.D_WORD_VEC = 72
 __C.NOISE_SIZE = __C.D_WORD_VEC
 
 w_d = 1
 f_d = 1
-r_d = w_d + f_d
+r_d = 1
 
 
 f_g = 2
@@ -57,7 +56,7 @@ __C.SCORE_INTERPOLATE_WEIGHT_G = i_g/(f_g+i_g)
 # Model g
 n_head = 4
 __C.ENC_PARAM_G = edict({'n_layers':8, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':2, 'n_head':n_head, 
-                'd_k':__C.D_WORD_VEC//n_head, 'd_v':__C.D_WORD_VEC//n_head, 'dropout':0.1, 'scale_emb':False})
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.DEC_PARAM_G = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':2, 'n_head':n_head, 
                 'd_k':__C.D_WORD_VEC//n_head, 'd_v':__C.D_WORD_VEC//n_head, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_G = []
@@ -66,9 +65,9 @@ __C.DROPOUT_G = 0.2
 
 # Model d
 __C.ENC_PARAM_D = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':2, 'n_head':n_head, 
-                'd_k':__C.D_WORD_VEC//n_head, 'd_v':__C.D_WORD_VEC//n_head, 'dropout':0.1, 'scale_emb':False})
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.DEC_PARAM_D = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':2, 'n_head':n_head, 
-                'd_k':__C.D_WORD_VEC//n_head, 'd_v':__C.D_WORD_VEC//n_head, 'dropout':0.1, 'scale_emb':False})
+                'd_k':32, 'd_v':32, 'dropout':0.1, 'scale_emb':False})
 __C.FC_LIST_D = []
 __C.DROPOUT_D = 0.2
 

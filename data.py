@@ -9,6 +9,7 @@ import random
 from tqdm import tqdm
 #import cv2
 import string
+import math
 
 
 from geometry import rotation2so3, rotation2AxisAngle, Rotation2Quaternion
@@ -65,6 +66,8 @@ class TheDataset(torch.utils.data.Dataset):
         self.dataset = []
         self.cfg = cfg
         previous_img_ids = []
+        kkk=0
+        print(math.pi)
         for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):            
             # 一筆eft資料對應到一張img中的一筆keypoint
             img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
@@ -90,7 +93,7 @@ class TheDataset(torch.utils.data.Dataset):
                 if text_model is not None:
                     caption_without_punctuation = ''.join([i for i in data['caption'] if i not in string.punctuation])
                     if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
-                        data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.MAX_SENTENCE_LEN, cfg.D_WORD_VEC)
+                        data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.JOINT_NUM, cfg.D_WORD_VEC)
                         self.dataset.append(data)      
     
     def __len__(self):
@@ -107,7 +110,7 @@ class TheDataset(torch.utils.data.Dataset):
         """unsqueeze_ is in place operation, unsqueeze isn't"""
         item['vec_mismatch'], item['vec_mismatch_mask'] = self.get_text_mismatch(index)
         item['vec_interpolated'], item['vec_interpolated_mask'] = self.get_interpolated_text(0.5)
-            
+        item['so3_wrong']= torch.tensor(self.get_so3_wrong(index), dtype=torch.float32)
         return item
     
     # get a batch of random caption sentence vectors from the whole dataset
@@ -115,6 +118,11 @@ class TheDataset(torch.utils.data.Dataset):
         others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
         data_random = self.dataset[random.choice(others)]
         return data_random['vector'], data_random['vec_mask']
+    
+    def get_so3_wrong(self, index):
+        others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
+        data_random = self.dataset[random.choice(others)]
+        return data_random['so3']
     
     # get a batch of random interpolated caption sentence vectors from the whole dataset
     # 預設mask我是用or但不確定合不合理?
