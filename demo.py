@@ -1,7 +1,8 @@
 import json
 import copy
 import torch
-from models.model_gan import Generator
+from models.model_gan import Generator, LinearDecoder
+from models.transformer import Encoder, Decoder
 from config import cfg
 from utils import get_noise_tensor, get_caption_vector
 import string
@@ -17,12 +18,22 @@ import math
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_50' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_186' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
     ##
-    net_g = Generator(cfg.ENC_PARAM_G, cfg.DEC_PARAM_G, cfg.FC_LIST_G, cfg.D_WORD_VEC).to(device)
+    shareEncoder = Encoder(n_layers=cfg.ENC_PARAM_D.n_layers, 
+                            d_model=cfg.ENC_PARAM_D.d_model, 
+                            d_inner_scale=cfg.ENC_PARAM_D.d_inner_scale, 
+                            n_head=cfg.ENC_PARAM_D.n_head, 
+                            d_k=cfg.ENC_PARAM_D.d_k, 
+                            d_v=cfg.ENC_PARAM_D.d_v, 
+                            dropout=cfg.ENC_PARAM_D.dropout, 
+                            scale_emb=cfg.ENC_PARAM_D.scale_emb)
+    decoder_g = LinearDecoder(cfg.D_WORD_VEC)
+                            
+    net_g = Generator(shareEncoder, decoder_g, device, cfg.D_WORD_VEC, cfg.NOISE_WEIGHT_G).to(device)
     net_g.load_state_dict(checkpoint['model_g'])
 
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
@@ -35,7 +46,7 @@ if __name__ == "__main__":
         eft_all_with_caption = json.load(f)
   
     eft_all_fake = eft_all_with_caption['data'] 
-    eft_all_fake = eft_all_fake[:400]
+    eft_all_fake = eft_all_fake[:1000]
     print(len(eft_all_fake))
     net_g.eval()
     
@@ -61,9 +72,10 @@ if __name__ == "__main__":
         for j, captions_ann in enumerate(captions_anns):
             if j > 0:
                 break        
-            print(str(i) + ": " +captions_ann['caption'])
+            
             caption_without_punctuation = ''.join([j for j in captions_ann['caption'] if j not in string.punctuation])
             if len(caption_without_punctuation.split()) < cfg.MAX_SENTENCE_LEN:
+                print(str(i) + ": " +captions_ann['caption'])
                 data['vector'], data['vec_mask'] = get_caption_vector(text_model, caption_without_punctuation, cfg.JOINT_NUM, cfg.D_WORD_VEC)
 
                 text_match = torch.tensor(data['vector'], dtype=torch.float32).unsqueeze(0)
@@ -88,6 +100,7 @@ if __name__ == "__main__":
                 for j in range(len(eft_all_fake[i]['parm_pose'])):
                     v.append(so32rotation(rotation2so3(eft_all_fake[i]['parm_pose'][j])))"""
                 eft_all_fake[i]['parm_pose'] = parm_pose
+                eft_all_fake[i]['caption'] = captions_ann['caption']
                 output.append(eft_all_fake[i])
     
     with open('./demo/eft_50.json', 'w') as f:

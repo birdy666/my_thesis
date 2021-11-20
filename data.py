@@ -80,7 +80,7 @@ class TheDataset(torch.utils.data.Dataset):
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             # 每個cation都創一個資料
             for j, caption_ann in enumerate(captions_anns):
-                if j > 1:
+                if j > 5:
                     break
                 data = {'caption': caption_ann['caption'],
                         'parm_pose': eft_data_all[i]['parm_pose'],
@@ -106,19 +106,12 @@ class TheDataset(torch.utils.data.Dataset):
         item['so3'] = torch.tensor(data['so3'], dtype=torch.float32)
         #item['vector'].unsqueeze_(-1).unsqueeze_(-1) 完全不知道我這裡要不要
         item['vector'] = torch.tensor(data['vector'], dtype=torch.float32)
-        item['vec_mask'] = torch.tensor(data['vec_mask'], dtype=torch.int)
-        """unsqueeze_ is in place operation, unsqueeze isn't"""
-        item['vec_mismatch'], item['vec_mismatch_mask'] = self.get_text_mismatch(index)
+        item['vec_mask'] = torch.tensor(data['vec_mask'], dtype=torch.float32)
         item['vec_interpolated'], item['vec_interpolated_mask'] = self.get_interpolated_text(0.5)
         item['so3_wrong']= torch.tensor(self.get_so3_wrong(index), dtype=torch.float32)
         return item
     
-    # get a batch of random caption sentence vectors from the whole dataset
-    def get_text_mismatch(self, index):
-        others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
-        data_random = self.dataset[random.choice(others)]
-        return data_random['vector'], data_random['vec_mask']
-    
+    # get a batch of random so3 from the whole dataset    
     def get_so3_wrong(self, index):
         others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
         data_random = self.dataset[random.choice(others)]
@@ -134,46 +127,3 @@ class TheDataset(torch.utils.data.Dataset):
         mask = f_mask(self.dataset[index1]['vec_mask'], self.dataset[index2]['vec_mask'])
         # interpolate caption sentence vectors
         return beta * vector1 + (1 - beta) * vector2, np.array(mask)
-
-
-if __name__ == "__main__":
-    """coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
-    generate_eft(cfg, coco_caption, coco_keypoint)"""
-    """#with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f: # in docker
-    with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
-        eft_all_with_caption = json.load(f)
-    coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
-    for i in range(1):
-        print(eft_all_with_caption[i]['imageName'])
-        imgid = coco_keypoint.loadAnns(eft_all_with_caption[17]['annotId'])[0]['image_id']
-        caption_ids = coco_caption.getAnnIds(imgIds=imgid)
-        captions = coco_caption.loadAnns(ids=caption_ids)
-        print(captions)"""
-    #coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    #coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
-    eft_data_all = getEFTCaption(cfg)  
-    min_list = []
-    max_list = []      
-    for i in range(1000):
-        """print("=======================================================")
-        print(str(i))
-        print("=======================================================")"""
-        so3 = np.array([rotation2so3(R) for R in eft_data_all[i]['parm_pose']])
-        norm = np.linalg.norm(so3, axis=1)
-        min_list.append(min(norm))
-        max_list.append(max(norm))
-        """# 一筆eft資料只有一筆img_id
-        img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
-        # 但對於同一個圖片會有很多語意相同的captions
-        caption_ids = coco_caption.getAnnIds(imgIds=img_id)
-        captions_anns = coco_caption.loadAnns(ids=caption_ids)
-        # 每個cation都創一個資料
-        for j, caption_ann in enumerate(captions_anns):
-            if j > 3:
-                    break
-            print(caption_ann['caption'])"""
-        
-    print(min(min_list))
-    print(max(max_list))

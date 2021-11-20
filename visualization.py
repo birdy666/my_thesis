@@ -221,7 +221,8 @@ def visEFT_singleSubject(renderer, eft_data_all):
                 os.mkdir(args.render_dir)
             #render_output_path = args.render_dir + '/render_{}_eft{:08d}.jpg'.format(imgName[:-4],idx)
             render_output_path = args.render_dir + '/render_eft{:08d}.jpg'.format(idx)
-            print(f"Save to {render_output_path}")
+            #print(f"Save to {render_output_path}")
+            print(eft_data['caption'])
             cv2.imwrite(render_output_path, saveImg)
         
 
@@ -233,6 +234,6 @@ if __name__ == '__main__':
     #with open('../eft/eft_fit/COCO2014-All-ver01_with_caption.json','r') as f:
     with open('./demo/eft_50.json','r') as f:
         eft_all_with_caption = json.load(f)
-        eft_all_with_caption = eft_all_with_caption[:50]
+        eft_all_with_caption = eft_all_with_caption[:200]
     visEFT_singleSubject(renderer,eft_all_with_caption)
 

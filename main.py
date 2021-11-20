@@ -23,7 +23,6 @@ if __name__ == "__main__":
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, drop_last=True)
     dataLoader_val = torch.utils.data.DataLoader(dataset_val, batch_size=cfg.BATCH_SIZE, shuffle=False, drop_last=True)
     
-    # 這裡原本論文因為輸入輸出一樣 所以他這裡直接把d_model當作一個像是常數的參數 但我的模型不一樣 ...
     optimizer_g = ScheduledOptim(
         torch.optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=cfg.WEIGHT_DECAY_G),
         lr_mul=2.0, d_model=300, n_warmup_steps=cfg.N_WARMUP_STEPS_G, n_steps=checkpoint['n_steps_g'] if checkpoint!=None else 0)
