@@ -27,8 +27,8 @@ parser.add_argument('--onbbox',action="store_true", help="Show the 3D pose on bb
 parser.add_argument('--rendermode',default="geo", help="Choose among geo, normal, densepose")
 
 
-parser.add_argument('--render_dir',default="render_eft_fake", help="Folder to save rendered images")
-#parser.add_argument('--render_dir',default="render_eft", help="Folder to save rendered images")
+#parser.add_argument('--render_dir',default="render_eft_fake", help="Folder to save rendered images")
+parser.add_argument('--render_dir',default="render_eft", help="Folder to save rendered images")
 
 
 parser.add_argument('--waitforkeys',action="store_true", help="If true, it will pasue after each visualizing each sample, waiting for any key pressed")
@@ -223,6 +223,8 @@ def visEFT_singleSubject(renderer, eft_data_all):
             render_output_path = args.render_dir + '/render_eft{:08d}.jpg'.format(idx)
             #print(f"Save to {render_output_path}")
             print(eft_data['caption'])
+            print(idx)
+            print("=====================================================")
             cv2.imwrite(render_output_path, saveImg)
         
 

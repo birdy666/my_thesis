@@ -14,11 +14,11 @@ import numpy as np
 
 import torch.nn.functional as F
 import math
-
+keywords = ['ski', 'baseball', 'bike','tennis','skateboard','kite']
 device = torch.device('cpu')
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_186' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_1550' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         eft_all_with_caption = json.load(f)
   
     eft_all_fake = eft_all_with_caption['data'] 
-    eft_all_fake = eft_all_fake[:1000]
+    eft_all_fake = eft_all_fake
     print(len(eft_all_fake))
     net_g.eval()
     
@@ -68,6 +68,15 @@ if __name__ == "__main__":
         # 但對於同一個圖片會有很多語意相同的captions
         caption_ids = coco_caption.getAnnIds(imgIds=img_id)
         captions_anns = coco_caption.loadAnns(ids=caption_ids)
+
+        save_this = False
+        category = 0
+        for nk in range(len(keywords)):
+            if keywords[nk] in captions_anns[0]['caption']:
+                save_this = True
+                category = nk
+        if not save_this:
+            continue
 
         for j, captions_ann in enumerate(captions_anns):
             if j > 0:
@@ -99,7 +108,7 @@ if __name__ == "__main__":
                 """v = []
                 for j in range(len(eft_all_fake[i]['parm_pose'])):
                     v.append(so32rotation(rotation2so3(eft_all_fake[i]['parm_pose'][j])))"""
-                eft_all_fake[i]['parm_pose'] = parm_pose
+                #eft_all_fake[i]['parm_pose'] = parm_pose
                 eft_all_fake[i]['caption'] = captions_ann['caption']
                 output.append(eft_all_fake[i])
     

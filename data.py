@@ -12,10 +12,12 @@ import string
 import math
 
 
-from geometry import rotation2so3, rotation2AxisAngle, Rotation2Quaternion
-from utils import get_noise_tensor, get_caption_vector
+from geometry import rotation2so3
+from utils import get_caption_vector
 from config import cfg
 
+keywords = ['ski', 'baseball', 'motor','tennis','skateboard','kite']
+not_keywords = ["stand", "sit"]
 
 #data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
     #data['parm_shape']       #10 dim vector
@@ -60,34 +62,51 @@ def getData(cfg):
     #return text_model, dataset, dataset_val, data_loader#, text_match_val, label_val
     return text_model, eft_data_all, dataset_train, dataset_val
 
+def saveImgOrNot(caption):
+    save_this = False
+    category = 0
+    for nnk in range(len(not_keywords)):
+        if not_keywords[nnk] in caption:
+            return save_this, category
+
+    for nk in range(len(keywords)):
+        if keywords[nk] in caption:                    
+            save_this = True
+            category = nk
+    return save_this, category
+    
 
 class TheDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, eft_data_all, coco_caption, coco_keypoint, text_model=None, val=False):
         self.dataset = []
         self.cfg = cfg
         previous_img_ids = []
-        kkk=0
         print(math.pi)
         for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):            
-            # 一筆eft資料對應到一張img中的一筆keypoint
+            # one eft data correspond to one keypoint in one img
             img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
-            if img_id in previous_img_ids:
+            if False:
                 continue
             else:
                 previous_img_ids.append(img_id)
-            # 但對於同一個圖片會有很多語意相同的captions
+            # many captions for one img
             caption_ids = coco_caption.getAnnIds(imgIds=img_id)
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
-            # 每個cation都創一個資料
+            
+            save_this, category = saveImgOrNot(captions_anns[0]['caption'])
+            if not save_this:
+                continue
+            # n caption with the same pose
             for j, caption_ann in enumerate(captions_anns):
-                if j > 5:
+                if j > 1:
                     break
                 data = {'caption': caption_ann['caption'],
                         'parm_pose': eft_data_all[i]['parm_pose'],
                         'parm_shape': eft_data_all[i]['parm_shape'],
                         'smpltype': eft_data_all[i]['smpltype'],
                         'annotId': eft_data_all[i]['annotId'],
-                        'imageName': eft_data_all[i]['imageName']}
+                        'imageName': eft_data_all[i]['imageName'],
+                        'category': category}
                 data['so3'] = np.array([rotation2so3(R) for R in data['parm_pose']])
                 # add sentence encoding
                 if text_model is not None:
@@ -101,10 +120,8 @@ class TheDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         data = self.dataset[index]
-        item = dict()        
-        # change heatmap range from [0,1] to[-1,1]
+        item = dict()
         item['so3'] = torch.tensor(data['so3'], dtype=torch.float32)
-        #item['vector'].unsqueeze_(-1).unsqueeze_(-1) 完全不知道我這裡要不要
         item['vector'] = torch.tensor(data['vector'], dtype=torch.float32)
         item['vec_mask'] = torch.tensor(data['vec_mask'], dtype=torch.float32)
         item['vec_interpolated'], item['vec_interpolated_mask'] = self.get_interpolated_text(0.5)
@@ -113,12 +130,18 @@ class TheDataset(torch.utils.data.Dataset):
     
     # get a batch of random so3 from the whole dataset    
     def get_so3_wrong(self, index):
-        others = list(range(0, index)) + list(range(index+1, len(self.dataset)))
+        """others = list(range(0, index-5)) + list(range(index+1+5, len(self.dataset)))
         data_random = self.dataset[random.choice(others)]
-        return data_random['so3']
-    
+        return data_random['so3']"""
+        while True:
+            data_random = self.dataset[random.choice(list(range(0, len(self.dataset))))]
+            if data_random['category'] != self.dataset[index]['category']:
+                return data_random['so3']
+        """data_randoms = [self.dataset[random.choice(others)]['so3'] for i in range(40)]
+        return np.sum(data_randoms, axis=0)/40"""
+
     # get a batch of random interpolated caption sentence vectors from the whole dataset
-    # 預設mask我是用or但不確定合不合理?
+    # not sure if it makes sense to use "or" for mask
     def get_interpolated_text(self, beta, f_mask = lambda x,y: [1 if x[i] or y[i] else 0 for i in range(len(x))]):
         index1 = random.randint(0, len(self.dataset)-1)  # randint(a, b) （a <= N <= b）
         index2 = random.randint(0, len(self.dataset)-1)

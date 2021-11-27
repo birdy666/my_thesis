@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
-from tqdm import tqdm
 from optim import ScheduledOptim
-
 from config import cfg
 from train_conditional import train
 from data import getData
@@ -29,7 +26,6 @@ if __name__ == "__main__":
     optimizer_d = ScheduledOptim(
         torch.optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=cfg.WEIGHT_DECAY_D),
         lr_mul=2.0, d_model=300, n_warmup_steps=cfg.N_WARMUP_STEPS_D, n_steps=checkpoint['n_steps_d'] if checkpoint!=None else 0)    
-    criterion = nn.BCELoss()
-
-    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, criterion, dataLoader_train, dataLoader_val)
+    
+    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, dataLoader_val)
     

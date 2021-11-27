@@ -4,10 +4,8 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-from models.transformer import Encoder, Decoder
-from models.layers import EncoderLayer, DecoderLayer
-from utils import get_noise_tensor
-import numpy as np
+from models.transformer import Encoder, Decoder, LinearDecoder
+from models.sublayers import LinearWithChannel
 
 def getModels(cfg, device, checkpoint=None):
     shareEncoder = Encoder(n_layers=cfg.ENC_PARAM_D.n_layers, 
@@ -45,120 +43,46 @@ def init_weight(m):
     if type(m) == nn.Linear:
         nn.init.xavier_uniform(m.weight.data, 1.)
 
-class LinearWithChannel(nn.Module):
-    # https://github.com/pytorch/pytorch/issues/36591
-    def __init__(self, input_size, output_size, channel_size):
-        super(LinearWithChannel, self).__init__()
-        
-        #initialize weights
-        self.w = torch.nn.Parameter(torch.zeros(channel_size, input_size, output_size))
-        self.b = torch.nn.Parameter(torch.zeros(1, channel_size, output_size))
-        
-        #change weights to kaiming
-        self.reset_parameters(self.w, self.b)
-        
-    def reset_parameters(self, weights, bias):
-        
-        torch.nn.init.kaiming_uniform_(weights, a=math.sqrt(3))
-        fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(weights)
-        bound = 1 / math.sqrt(fan_in)
-        torch.nn.init.uniform_(bias, -bound, bound)
-    
-    def forward(self, x):
-        return ( x.unsqueeze(-2) @ self.w).squeeze(-2) + self.b
-
-class LinearDecoder(nn.Module):
-    def __init__(self, d_vec):
-        super().__init__()
-        self.fcc1 = LinearWithChannel(d_vec, d_vec, 24)
-        self.fcc2 = LinearWithChannel(d_vec, d_vec//2, 24)
-        self.fc1 = nn.Linear(24*d_vec//2, 2*24*d_vec//2)
-        self.fc2 = nn.Linear(2*24*d_vec//2, 24*d_vec//2)
-        self.dropout_1 = nn.Dropout(0.1)
-        self.tanh1 = nn.Tanh()
-        self.tanh2 = nn.Tanh()
-
-        self.fcc3 = LinearWithChannel(d_vec//2, d_vec//2, 24)
-        self.fcc4 = LinearWithChannel(d_vec//2, d_vec//3, 24)
-        self.fc3 = nn.Linear(24*d_vec//3, 2*24*d_vec//3)
-        self.fc4 = nn.Linear(2*24*d_vec//3, 24*d_vec//3)
-        self.dropout_2 = nn.Dropout(0.1)
-        self.tanh3 = nn.Tanh()
-        self.tanh4 = nn.Tanh()
-
-        self.fcc5 = LinearWithChannel(d_vec//3, d_vec//3, 24)
-        self.fcc6 = LinearWithChannel(d_vec//3, d_vec//4, 24)
-        self.fc5 = nn.Linear(24*d_vec//4, 2*24*d_vec//4)
-        self.fc6 = nn.Linear(2*24*d_vec//4, 24*d_vec//4)
-        self.dropout_3 = nn.Dropout(0.1)
-        
-        self.fcc_final1 = LinearWithChannel(d_vec//4, d_vec//4, 24)
-        self.fcc_final2 = LinearWithChannel(d_vec//4, 3, 24)
-
-    def forward(self, x):
-        batch_size = x.size(0)
-        x = self.fcc1(x)
-        x = self.fcc2(x).view(batch_size,-1)
-        x = self.tanh1(self.fc1(x))
-        x = self.tanh2(self.fc2(x)).view(batch_size,24,-1)
-        x = self.dropout_1(x)
-
-        x = self.fcc3(x)
-        x = self.fcc4(x).view(batch_size,-1)
-        x = self.tanh3(self.fc3(x))
-        x = self.tanh4(self.fc4(x)).view(batch_size,24,-1)
-        x = self.dropout_2(x)
-
-        x = self.fcc5(x)
-        x = self.fcc6(x).view(batch_size,-1)
-        x = self.fc5(x)
-        x = self.fc6(x).view(batch_size,24,-1)
-        x = self.dropout_3(x)
-
-        x = self.fcc_final1(x)
-                
-        return F.hardtanh(self.fcc_final2(x), min_val=-math.pi+0.0000000001, max_val=math.pi-0.0000000001)
-
 class Generator(nn.Module):
     def __init__(self, encoder, decoder, device, d_vec, noise_weight):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.fc = LinearWithChannel(d_vec, d_vec//3, 24)
         self.dropout = nn.Dropout(0.1)
         self.device = device
         self.d_vec = d_vec
         self.noise_weight = noise_weight
 
     def forward(self, input_text, input_mask, noise):
-        batch_size = input_text.size(0)
         enc_output = self.encoder(input_text, input_mask)
         enc_output = self.dropout(enc_output)
         x = torch.ones_like(enc_output, dtype=torch.float32).to(self.device)        
-        x = x + self.noise_weight*torch.randn((batch_size, 24, enc_output.size(-1)), dtype=torch.float32).to(self.device)
+        #x = x + self.noise_weight*noise
         
         enc_output_masked = enc_output.masked_fill(input_mask.unsqueeze(-1) == 0, 0)
         attn = torch.matmul(x , enc_output_masked.transpose(-2, -1))
         score = torch.matmul(attn, enc_output_masked)
         # each sentence has different length
-        score = F.normalize(score, p=1, dim=-1)        
+        score = F.normalize(score, p=1, dim=-1)
         output = self.decoder(score)
         return  output
-
 
 class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, device, d_vec, noise_weight):
         super().__init__()
+        self.device = device
+        self.d_vec = d_vec  
+        self.noise_weight = noise_weight
+
         self.encoder = encoder
         self.decoder = decoder
-        self.fc = nn.Linear(d_vec, 1)
+        self.fc = nn.Linear(d_vec, 2)
         self.fc2 = nn.Linear(24, 1)
-        self.fcc = LinearWithChannel(d_vec,1,24)
+        self.fcc = LinearWithChannel(d_vec,2,24)
         self.dropout1 = nn.Dropout(0.1)
-        self.dropout2 = nn.Dropout(0.1)
-        self.device = device
-        self.d_vec = d_vec      
-        self.noise_weight = noise_weight  
+        self.dropout2 = nn.Dropout(0.1) 
+        self.act1 = nn.LeakyReLU(0.2, inplace=False)
+        self.act2 = nn.LeakyReLU(0.2, inplace=False)
         
     def forward(self, input_text, input_mask, rot_vec):
         batch_size = input_text.size(0)
@@ -169,13 +93,15 @@ class Discriminator(nn.Module):
         # decoder output
         dec_output = self.decoder(enc_output, 
                                 enc_mask=input_mask, 
-                                dec_input=rot_vec.repeat(1,1,self.d_vec//3), 
+                                dec_input=F.pad(rot_vec,(0,self.d_vec-3), mode='constant', value=0.0),
+                                #F.pad(rot_vec,(0,self.d_vec-3), mode='constant', value=0.0), 
                                 dec_mask=torch.tensor(np.array([[1]+[1]*23]*batch_size)).to(self.device))
         
         #output = self.dropout(self.fc(output.view(batch_size, -1)))  
-        output = F.relu(self.dropout1(dec_output))    
+        #output = F.relu(self.dropout1(dec_output))    
         #output = self.fc(dec_output.view(batch_size, 24, -1)).view(batch_size,24)   
-        output = self.fcc(dec_output).view(batch_size, 24)
-        output = F.relu(self.dropout2(output))
-        output = self.fc2(output)        
-        return output.mean()
+        #output = self.fcc(dec_output).view(batch_size, 24)
+        #output = F.relu(self.dropout2(output))
+        #output = self.fc2(output)
+        output = self.fcc(dec_output)
+        return output

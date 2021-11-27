@@ -2,13 +2,10 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
-import os
 import math
 from torch.autograd import Variable
 
 class ScaledDotProductAttention(nn.Module):
-    ''' Scaled Dot-Product Attention '''
-
     def __init__(self, temperature, attn_dropout=0.1):
         super().__init__()
         # square root of d_k 
@@ -17,14 +14,12 @@ class ScaledDotProductAttention(nn.Module):
 
     def forward(self, q, k, v, mask=None):
         attn = torch.matmul(q , k.transpose(-2, -1)) / self.temperature
-
         if mask is not None:
             mask = mask.unsqueeze(1)   # For head axis broadcasting.
             attn = attn.masked_fill(mask == 0, -1e9)
 
         attn = self.dropout(F.softmax(attn, dim=-1))
-        output = torch.matmul(attn, v)
-        
+        output = torch.matmul(attn, v)        
         return output
 
 class MultiHeadAttention(nn.Module):
@@ -45,12 +40,8 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
-    
-    """
-    q = k = v = enc_input
-    """
+    # q = k = v = enc_input
     def forward(self, q, k, v, mask=None):
-
         d_k, d_v, n_head = self.d_k, self.d_v, self.n_head
         batch_size, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
 
@@ -60,7 +51,6 @@ class MultiHeadAttention(nn.Module):
 
         q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
 
-
         score = self.attention(q, k, v, mask=mask)
 
         score_concat = score.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
@@ -69,12 +59,10 @@ class MultiHeadAttention(nn.Module):
         return output
 
 class PositionwiseFeedForward(nn.Module):
-    ''' A two-feed-forward-layer module '''
-
     def __init__(self, d_in, d_hid, dropout=0.1):
         super().__init__()
-        self.w_1 = nn.Linear(d_in, d_hid) # position-wise
-        self.w_2 = nn.Linear(d_hid, d_in) # position-wise
+        self.w_1 = nn.Linear(d_in, d_hid)
+        self.w_2 = nn.Linear(d_hid, d_in)
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_in, eps=1e-6)
 
@@ -89,8 +77,7 @@ class PositionalEncoder(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.dropout = nn.Dropout(dropout)
-        # create constant 'pe' matrix with values dependant on 
-        # pos and i
+        # create constant 'pe' matrix with values dependant on pos and i
         pe = torch.zeros(max_seq_len, d_model)
         for pos in range(max_seq_len):
             for i in range(0, d_model, 2):
@@ -99,8 +86,7 @@ class PositionalEncoder(nn.Module):
                 pe[pos, i + 1] = \
                 math.cos(pos / (10000 ** ((2 * (i + 1))/d_model)))
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
- 
+        self.register_buffer('pe', pe) 
     
     def forward(self, x):
         # make embeddings relatively larger
@@ -112,3 +98,22 @@ class PositionalEncoder(nn.Module):
             pe.cuda()
         x = x + pe
         return self.dropout(x)
+
+class LinearWithChannel(nn.Module):
+    # https://github.com/pytorch/pytorch/issues/36591
+    def __init__(self, input_size, output_size, channel_size):
+        super(LinearWithChannel, self).__init__()        
+        #initialize weights
+        self.w = torch.nn.Parameter(torch.zeros(channel_size, input_size, output_size))
+        self.b = torch.nn.Parameter(torch.zeros(1, channel_size, output_size))        
+        #change weights to kaiming
+        self.reset_parameters(self.w, self.b)
+        
+    def reset_parameters(self, weights, bias):        
+        torch.nn.init.kaiming_uniform_(weights, a=math.sqrt(3))
+        fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(weights)
+        bound = 1 / math.sqrt(fan_in)
+        torch.nn.init.uniform_(bias, -bound, bound)
+    
+    def forward(self, x):
+        return ( x.unsqueeze(-2) @ self.w).squeeze(-2) + self.b

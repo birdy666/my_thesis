@@ -28,7 +28,6 @@ def get_caption_vector(text_model, caption_without_punctuation, max_sentence_len
     vectors = [text_model.get_word_vector(word) for word in words_list]
     mask = np.array(get_input_mask(vectors, max_sentence_len))
     return np.array(pad_vector(vectors, max_sentence_len, d_word_vec)), mask
-    #return text_model.get_sentence_vector(caption.replace('\n', '').lower()) * encoding_weight
 
 """TODO 24is hyperparameter"""
 # get a batch of noise vectors
@@ -36,7 +35,6 @@ def get_noise_tensor(batch_size, noise_size):
     """batch_size x 24 x noise_size"""
     noise_tensor = torch.randn((batch_size, 24, noise_size), dtype=torch.float32)
     return noise_tensor
-    #return torch.tensor([[[1]*noise_size]*24]*batch_size, dtype=torch.float32)
 
 def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
     print('  - {header:12} epoch {e}, loss_g: {loss_g: 8.5f}, loss_d: {loss_d:8.5f} %, lr_g: {lr_g:8.5f}, lr_d: {lr_d:8.5f}, '\
@@ -56,7 +54,3 @@ def save_models(cfg, e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mo
         if valid_loss <= min(valid_losses):
             torch.save(checkpoint, os.path.join(opt.output_dir, model_name))
             print('    - [Info] The checkpoint file has been updated.')"""
-
-
-if __name__ == "__main__":
-    print(np.random.randn())

@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from models.layers import EncoderLayer, DecoderLayer
-from models.sublayers import PositionalEncoder
-
+import torch.nn.functional as F
+import math
+from models.layers import EncoderLayer, DecoderLayer, LinearDecoderLayer
+from models.sublayers import PositionalEncoder, LinearWithChannel, MultiHeadAttention
 
 class Encoder(nn.Module):
     def __init__(self, n_layers=4, d_model=144, d_inner_scale=4, n_head=8, 
@@ -58,3 +59,33 @@ class Decoder(nn.Module):
         for dec_layer in self.decoder_stack:
             dec_output = dec_layer(dec_output, enc_output, slf_attn_mask=dec_mask, dec_enc_attn_mask=enc_mask.unsqueeze(-2)) 
         return dec_output
+
+class LinearDecoder(nn.Module):
+    def __init__(self, d_vec, d=False):
+        super().__init__()
+        self.pe = PositionalEncoder(d_vec, dropout=0.1)
+        self.ln_dec_layer_1 =  LinearDecoderLayer(d_vec, d_vec//2, s=4) # 144 -> 72
+        self.slf_attn_1 = MultiHeadAttention(n_head=4, d_model=d_vec//2, d_k=d_vec//2//4, d_v=d_vec//2//4, dropout=0.1)
+        self.ln_dec_layer_2 =  LinearDecoderLayer(d_vec//2, d_vec//3, s=4) # 72 -> 48
+        self.slf_attn_2 = MultiHeadAttention(n_head=4, d_model=d_vec//3, d_k=d_vec//3//4, d_v=d_vec//3//4, dropout=0.1)
+        self.ln_dec_layer_3 =  LinearDecoderLayer(d_vec//3, d_vec//4, s=4) # 48 ->36
+        self.slf_attn_3 = MultiHeadAttention(n_head=4, d_model=d_vec//4, d_k=d_vec//4//4, d_v=d_vec//4//4, dropout=0.1)
+    
+        self.ln_dec_layer_4 =  LinearDecoderLayer(d_vec//4, 3, s=4)
+
+
+    def forward(self, x):
+        x = self.pe(x)
+
+        x = self.ln_dec_layer_1(x)
+        x = self.slf_attn_1(x,x,x)
+
+        x = self.ln_dec_layer_2(x)
+        x = self.slf_attn_2(x,x,x)
+
+        x = self.ln_dec_layer_3(x)
+        x = self.slf_attn_3(x,x,x)
+
+        x = self.ln_dec_layer_4(x)      
+        return F.hardtanh(x, min_val=-math.pi+0.0000000001, max_val=math.pi-0.0000000001)
+        
