@@ -16,8 +16,10 @@ from geometry import rotation2so3
 from utils import get_caption_vector
 from config import cfg
 
-keywords = ['ski', 'baseball', 'motor','tennis','skateboard','kite']
-not_keywords = ["stand", "sit"]
+#keywords = ['ski', 'baseball', 'motor','tennis','skateboard','kite']
+#keywords = ['frisbee', 'baseball', 'skateboard', 'surf','skiing']
+keywords = ['frisbee','skateboard', 'tennis']
+not_keywords = ["stand", "sit", "walk", "observ", "parked", "picture", "photo", "post"]
 
 #data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
     #data['parm_shape']       #10 dim vector
@@ -85,7 +87,7 @@ class TheDataset(torch.utils.data.Dataset):
         for i in tqdm(range(len(eft_data_all)), desc='  - (Dataset)   ', leave=False):            
             # one eft data correspond to one keypoint in one img
             img_id = coco_keypoint.loadAnns(eft_data_all[i]['annotId'])[0]['image_id']
-            if False:
+            if img_id in previous_img_ids:
                 continue
             else:
                 previous_img_ids.append(img_id)

@@ -32,9 +32,7 @@ def get_grad_penalty(batch_size, device, net_d, so3_real, so3_fake, text_match, 
                     grad_outputs=torch.ones_like(score_interpolated_fake).to(device),
                     create_graph=True, 
                     retain_graph=True)[0]
-    #grad_fake_norm = gradient_fake.norm(2, dim=1)
-    #grad_penalty_fake = ((grad_fake_norm - 1) ** 2)
-    grad_fake_norm = torch.sqrt(torch.sum(gradient_fake.reshape(batch_size, -1) ** 2, dim=1) + 1e-12)
+    grad_fake_norm = torch.sqrt(torch.sum(gradient_fake.reshape(batch_size, -1) ** 2, dim=1) + 1e-5)
     grad_penalty_fake = ((grad_fake_norm - 1) ** 2).mean()  
     return grad_penalty_fake
 
@@ -46,7 +44,7 @@ def get_d_score(so3_d):
 def get_g_so3(output):
     return output
 
-def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True):
+def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, update_d=True):
     if update_d:
         net_d.zero_grad()    
 
@@ -58,6 +56,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     grad_penalty_fake = 0
     grad_penalty_wrong = 0
+    score_fake = 0
     if not update_d:        
         with torch.no_grad():
             # ground truth
@@ -78,25 +77,32 @@ def get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d=None, update_d=True
             for p in net_d.parameters():
                 p.data.clamp_(-c, c)
     elif algorithm == 'wgan-gp':
-        if update_d: 
+        if update_d:
+            
             for _ in range(cfg.N_TRAIN_ENC):
                 score_right = get_d_score(net_d(text_match, text_match_mask, so3_real))
                 # so3 wrong
-                score_wrong = get_d_score(net_d(text_match, text_match_mask, so3_wrong))  
+                score_wrong = get_d_score(net_d(text_match, text_match_mask, so3_wrong))             
+            
                 #grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_wrong, text_match, text_match_mask)
                 loss_d_rw = score_wrong - score_right
                 loss_d_rw.backward()
                 optimizer_d.step_and_update_lr()
-                net_d.zero_grad()            
-            
-            score_right = get_d_score(net_d(text_match, text_match_mask, so3_real))
-            # fake so3 by generator
-            so3_fake = get_g_so3(net_g(text_match, text_match_mask, noise).detach())
-            score_fake = get_d_score(net_d(text_match, text_match_mask, so3_fake)) 
-            grad_penalty_fake = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_fake, text_match, text_match_mask)
-            loss_d_rf = score_fake  - score_right + cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake 
-            loss_d_rf.backward()
-            optimizer_d.step_and_update_lr()
+                net_d.zero_grad()
+            if batch_index % cfg.N_TRAIN_ENC_1_TRAIN_D == 0:
+                net_d.zero_grad()
+                """for p in net_d.encoder.parameters():
+                    p.requires_grad=False"""
+                score_right = get_d_score(net_d(text_match, text_match_mask, so3_real))
+                # fake so3 by generator
+                so3_fake = get_g_so3(net_g(text_match, text_match_mask, noise).detach())
+                score_fake = get_d_score(net_d(text_match, text_match_mask, so3_fake)) 
+                grad_penalty_fake = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_fake, text_match, text_match_mask)
+                loss_d_rf = score_fake  - score_right + cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake 
+                loss_d_rf.backward()
+                optimizer_d.step_and_update_lr()
+                """for p in net_d.encoder.parameters():
+                    p.requires_grad=True"""
         else:
             grad_penalty_fake = 0
             grad_penalty_wrong = 0
@@ -152,34 +158,34 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_
         ###############################################################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###############################################################
-        score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, optimizer_d)         
+        score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, i, optimizer_d)         
         loss_d = cfg.SCORE_FAKE_WEIGHT_D * score_fake + cfg.SCORE_WRONG_WEIGHT_D * score_wrong \
                     - cfg.SCORE_RIGHT_WEIGHT_D * score_right 
-        total_loss_d += loss_d.item()
-        
-        if tb_writer != None:
-            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
-            tb_writer.add_scalars('loss_d_wf', {'R_W': score_right-score_wrong, 'W_F': score_wrong-score_fake, 'w_loss': score_right-score_fake}, e*len(dataLoader_train)+i)
+        if i % cfg.N_TRAIN_ENC ==0:
+            total_loss_d += loss_d.item()
+            if tb_writer != None:
+                tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
+                tb_writer.add_scalars('loss_d_wf', {'R_W': score_right-score_wrong, 'W_F': score_wrong-score_fake, 'w_loss': score_right-score_fake}, e*len(dataLoader_train)+i)
         
         ###############################################################
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
         # after training discriminator for N times, train gernerator for 1 time
-        if i % cfg.N_TRAIN_D_1_TRAINn_G == 0:
-            if cfg.SHARE_ENC:
+        if i % cfg.N_TRAIN_D_1_TRAIN_G == 0:
+            """if cfg.SHARE_ENC:
                 for p in net_g.encoder.parameters():
-                    p.requires_grad=False   
-            for _ in range(cfg.N_TRAIN_G):    
+                    p.requires_grad=False  """   
+            for _ in range(cfg.N_TRAIN_G):
                 #get losses
                 score_fake, score_interpolated= get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
                 loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G*score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G*score_interpolated)
                 total_loss_g += loss_g.item()
-            if cfg.SHARE_ENC:
+            """if cfg.SHARE_ENC:
                 for p in net_g.encoder.parameters():
-                    p.requires_grad=True           
+                    p.requires_grad=True   """        
             if tb_writer != None:
                 tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*len(dataLoader_train)+i)
-    return total_loss_g, total_loss_d
+    return total_loss_g/ (cfg.BATCH_SIZE/cfg.N_TRAIN_D_1_TRAIN_G/cfg.N_TRAIN_G), total_loss_d/(cfg.BATCH_SIZE/cfg.N_TRAIN_ENC)
 
 def val_epoch(cfg, device, net_g, net_d, dataLoader_val):
     # validate
@@ -273,12 +279,20 @@ if __name__ == "__main__":
             line = str(img_iddd[j]) + ": " + sentence
             f.write(line)
             f.write('\n')"""
-    
-    print(F.normalize(torch.tensor([1,5],dtype=torch.float32), p=1, dim=-1))
-    print(F.normalize(torch.tensor([-1,5],dtype=torch.float32), p=1, dim=-1))
-    print(F.normalize(torch.tensor([-1,-5],dtype=torch.float32), p=1, dim=-1))
-    
-   
+    mask = torch.tensor([[1,1,1,0],[1,1,0,0]])
+    mask_b = mask.unsqueeze(-2).unsqueeze(1)
+    a = torch.tensor([
+                    [[1,1,1],
+                    [2,2,2],
+                    [3,3,3],
+                    [4,4,4]],
 
-
-    
+                    [[5,5,5],
+                    [6,6,6],
+                    [7,7,7],
+                    [8,8,8]]
+                    ])
+    print(a.unsqueeze(1).size())
+    attn = torch.matmul(a.unsqueeze(1),a.unsqueeze(1).transpose(-2, -1))
+    print(attn)
+    print(attn.masked_fill(mask_b == 0, 0))

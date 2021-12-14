@@ -14,11 +14,27 @@ import numpy as np
 
 import torch.nn.functional as F
 import math
-keywords = ['ski', 'baseball', 'bike','tennis','skateboard','kite']
+keywords = ['frisbee','skateboard', 'tennis']
+not_keywords = ["stand", "sit", "walk", "observ", "parked", "picture", "photo", "post"]
 device = torch.device('cpu')
 
+def saveImgOrNot(caption):
+    save_this = False
+    category = 0
+    for nnk in range(len(not_keywords)):
+        if not_keywords[nnk] in caption:
+            return save_this, category
+
+    for nk in range(len(keywords)):
+        if keywords[nk] in caption:                    
+            save_this = True
+            category = nk
+    return save_this, category
+
+
+
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_1550' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_200' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
@@ -45,22 +61,22 @@ if __name__ == "__main__":
     #with open('/media/remote_home/chang/eft/eft_fit/COCO2014-All-ver01.json','r') as f:
         eft_all_with_caption = json.load(f)
   
-    eft_all_fake = eft_all_with_caption['data'] 
-    eft_all_fake = eft_all_fake
-    print(len(eft_all_fake))
+    eft_all_with_caption = eft_all_with_caption['data'] 
+    eft_all_with_caption = eft_all_with_caption[:10000]
+    print(len(eft_all_with_caption))
     net_g.eval()
     
     output = []
     min_list = []
     max_list = []
     previous_ids = []
-    for i in range(len(eft_all_fake)):
-        """if i % 10 !=0:
-            continue"""
+    for i in range(len(eft_all_with_caption)):
+        if i % 5 ==0:
+            continue        
         data = {}      
         #text_match = batch.get('vector').to(device) # torch.Size([128, 24, 300])
         #text_match_mask = batch.get('vec_mask').to(device)
-        img_id = coco_keypoint.loadAnns(eft_all_fake[i]['annotId'])[0]['image_id']
+        img_id = coco_keypoint.loadAnns(eft_all_with_caption[i]['annotId'])[0]['image_id']
         if img_id in previous_ids:
             continue
         else:
@@ -69,8 +85,9 @@ if __name__ == "__main__":
         caption_ids = coco_caption.getAnnIds(imgIds=img_id)
         captions_anns = coco_caption.loadAnns(ids=caption_ids)
 
-        save_this = False
-        category = 0
+        save_this, category = saveImgOrNot(captions_anns[0]['caption'])
+        if not save_this:
+            continue
         for nk in range(len(keywords)):
             if keywords[nk] in captions_anns[0]['caption']:
                 save_this = True
@@ -108,9 +125,9 @@ if __name__ == "__main__":
                 """v = []
                 for j in range(len(eft_all_fake[i]['parm_pose'])):
                     v.append(so32rotation(rotation2so3(eft_all_fake[i]['parm_pose'][j])))"""
-                #eft_all_fake[i]['parm_pose'] = parm_pose
-                eft_all_fake[i]['caption'] = captions_ann['caption']
-                output.append(eft_all_fake[i])
+                eft_all_with_caption[i]['parm_pose'] = parm_pose
+                eft_all_with_caption[i]['caption'] = captions_ann['caption']
+                output.append(eft_all_with_caption[i])
     
     with open('./demo/eft_50.json', 'w') as f:
         json.dump(output, f)

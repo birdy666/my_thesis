@@ -5,7 +5,7 @@ import math
 import numpy as np
 
 from models.transformer import Encoder, Decoder, LinearDecoder
-from models.sublayers import LinearWithChannel
+from models.sublayers import LinearWithChannel, MultiHeadAttention
 
 def getModels(cfg, device, checkpoint=None):
     shareEncoder = Encoder(n_layers=cfg.ENC_PARAM_D.n_layers, 
@@ -16,7 +16,7 @@ def getModels(cfg, device, checkpoint=None):
                             d_v=cfg.ENC_PARAM_D.d_v, 
                             dropout=cfg.ENC_PARAM_D.dropout, 
                             scale_emb=cfg.ENC_PARAM_D.scale_emb)
-    decoder_g = LinearDecoder(cfg.D_WORD_VEC)
+    decoder_g = LinearDecoder(cfg.D_WORD_VEC)    
     decoder_d = Decoder(n_layers=cfg.DEC_PARAM_D.n_layers, 
                             d_model=cfg.DEC_PARAM_D.d_model, 
                             d_inner_scale=cfg.DEC_PARAM_D.d_inner_scale, 
@@ -52,19 +52,20 @@ class Generator(nn.Module):
         self.device = device
         self.d_vec = d_vec
         self.noise_weight = noise_weight
+        self.cross_attn = MultiHeadAttention(n_head=4, d_model=d_vec, d_k=d_vec//4, d_v=d_vec//4, dropout=0.1)
 
     def forward(self, input_text, input_mask, noise):
         enc_output = self.encoder(input_text, input_mask)
         enc_output = self.dropout(enc_output)
-        x = torch.ones_like(enc_output, dtype=torch.float32).to(self.device)        
-        #x = x + self.noise_weight*noise
-        
-        enc_output_masked = enc_output.masked_fill(input_mask.unsqueeze(-1) == 0, 0)
+        x = torch.ones_like(enc_output, dtype=torch.float32).to(self.device)  
+
+        #dec_input = self.cross_attn(x, enc_output,enc_output, mask=input_mask.unsqueeze(-2))
+        """enc_output_masked = enc_output.masked_fill(input_mask.unsqueeze(-1) == 0, 0)
         attn = torch.matmul(x , enc_output_masked.transpose(-2, -1))
         score = torch.matmul(attn, enc_output_masked)
         # each sentence has different length
-        score = F.normalize(score, p=1, dim=-1)
-        output = self.decoder(score)
+        score = F.normalize(score, p=1, dim=-1)"""
+        output = self.decoder(x,enc_output,mask=input_mask.unsqueeze(-2))
         return  output
 
 class Discriminator(nn.Module):
@@ -79,10 +80,6 @@ class Discriminator(nn.Module):
         self.fc = nn.Linear(d_vec, 2)
         self.fc2 = nn.Linear(24, 1)
         self.fcc = LinearWithChannel(d_vec,2,24)
-        self.dropout1 = nn.Dropout(0.1)
-        self.dropout2 = nn.Dropout(0.1) 
-        self.act1 = nn.LeakyReLU(0.2, inplace=False)
-        self.act2 = nn.LeakyReLU(0.2, inplace=False)
         
     def forward(self, input_text, input_mask, rot_vec):
         batch_size = input_text.size(0)
@@ -97,11 +94,5 @@ class Discriminator(nn.Module):
                                 #F.pad(rot_vec,(0,self.d_vec-3), mode='constant', value=0.0), 
                                 dec_mask=torch.tensor(np.array([[1]+[1]*23]*batch_size)).to(self.device))
         
-        #output = self.dropout(self.fc(output.view(batch_size, -1)))  
-        #output = F.relu(self.dropout1(dec_output))    
-        #output = self.fc(dec_output.view(batch_size, 24, -1)).view(batch_size,24)   
-        #output = self.fcc(dec_output).view(batch_size, 24)
-        #output = F.relu(self.dropout2(output))
-        #output = self.fc2(output)
         output = self.fcc(dec_output)
         return output
