@@ -27,8 +27,8 @@ parser.add_argument('--onbbox',action="store_true", help="Show the 3D pose on bb
 parser.add_argument('--rendermode',default="geo", help="Choose among geo, normal, densepose")
 
 
-parser.add_argument('--render_dir',default="render_eft_fake", help="Folder to save rendered images")
-#parser.add_argument('--render_dir',default="render_eft", help="Folder to save rendered images")
+#parser.add_argument('--render_dir',default="render_eft_fake", help="Folder to save rendered images")
+parser.add_argument('--render_dir',default="render_eft", help="Folder to save rendered images")
 
 
 parser.add_argument('--waitforkeys',action="store_true", help="If true, it will pasue after each visualizing each sample, waiting for any key pressed")
@@ -162,7 +162,9 @@ def visEFT_singleSubject(renderer, eft_data_all):
             renderer.setCameraViewMode("cam")
 
             #Set image size for rendering
+            # HOHOHO
             renderer.setViewportSize(rawImg.shape[1], rawImg.shape[0])
+            #renderer.setViewportSize(64, 64)
                 
                 
             renderer.display()
@@ -220,7 +222,8 @@ def visEFT_singleSubject(renderer, eft_data_all):
             if os.path.exists(args.render_dir) == False:
                 os.mkdir(args.render_dir)
             #render_output_path = args.render_dir + '/render_{}_eft{:08d}.jpg'.format(imgName[:-4],idx)
-            render_output_path = args.render_dir + '/render_eft{:08d}.jpg'.format(idx)
+            #render_output_path = args.render_dir + '/' + eft_data['imageName']
+            render_output_path = args.render_dir + '/' + 'smaple_' + str(idx) + '.jpg'
             #print(f"Save to {render_output_path}")
             print(eft_data['caption'])
             print(idx)

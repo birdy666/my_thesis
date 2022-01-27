@@ -16,21 +16,22 @@ __C.SHARE_ENC = True
 __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
-__C.START_FROM_EPOCH = 0#200
-__C.END_IN_EPOCH = 7000#1200
+__C.START_FROM_EPOCH = 6501#200
+__C.END_IN_EPOCH = 25000#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
-__C.SAVE_MODEL_ITR = 200
+__C.SAVE_MODEL_ITR = 1000
 
 # training
-__C.N_TRAIN_D_1_TRAIN_G = 5# train discriminator k times before training generator
+__C.N_BATCH_TRAIN_G = 1# train discriminator k times before training generator
+__C.N_BATCH_TRAIN_D = 1
 __C.N_TRAIN_G = 1
 __C.N_TRAIN_ENC = 1
 __C.N_TRAIN_ENC_1_TRAIN_D = 1
 __C.BATCH_SIZE = 128
 __C.LEARNING_RATE_G = 1e-4
-__C.LEARNING_RATE_D = 1e-4
-__C.WEIGHT_DECAY_G = 0.0001
+__C.LEARNING_RATE_D = 4e-4
+__C.WEIGHT_DECAY_G = 0
 __C.WEIGHT_DECAY_D = 0
 __C.NOISE_WEIGHT_G = 0.4
 __C.NOISE_WEIGHT_D = 0.5
@@ -40,7 +41,8 @@ __C.WORKERS = 2
 __C.JOINT_NUM = 24
 __C.MAX_SENTENCE_LEN = 10
 
-__C.D_WORD_VEC = 72
+__C.D_WORD_VEC = 256
+__C.D_WORD_VEC_COMPRESS = 72
 __C.NOISE_SIZE = __C.D_WORD_VEC
 
 
@@ -56,7 +58,7 @@ __C.SCORE_WRONG_WEIGHT_D = w_d/(w_d+f_d+r_d)
 __C.SCORE_FAKE_WEIGHT_D = f_d/(w_d+f_d+r_d)
 __C.SCORE_RIGHT_WEIGHT_D = r_d/(w_d+f_d+r_d)
 __C.PENALTY_WEIGHT_WRONG = 1
-__C.PENALTY_WEIGHT_FAKE = 0.1
+__C.PENALTY_WEIGHT_FAKE = 0.01
 __C.SCORE_FAKE_WEIGHT_G = f_g/(f_g+i_g)
 __C.SCORE_INTERPOLATE_WEIGHT_G = i_g/(f_g+i_g)
 

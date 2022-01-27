@@ -5,7 +5,7 @@ import random
 import string
 import time
 
-def get_input_mask(vectors, max_sentence_len):
+def get_caption_mask(vectors, max_sentence_len):
     mask = []
     for _ in range(len(vectors)):
         mask.append(1)
@@ -26,7 +26,7 @@ def pad_vector(vectors, max_sentence_len, d_word_vec):
 def get_caption_vector(text_model, caption_without_punctuation, max_sentence_len, d_word_vec, encoding_weight=1):
     words_list = caption_without_punctuation.lower().split()
     vectors = [text_model.get_word_vector(word) for word in words_list]
-    mask = np.array(get_input_mask(vectors, max_sentence_len))
+    mask = np.array(get_caption_mask(vectors, max_sentence_len))
     return np.array(pad_vector(vectors, max_sentence_len, d_word_vec)), mask
 
 """TODO 24is hyperparameter"""

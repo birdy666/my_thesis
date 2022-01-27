@@ -7,3 +7,4 @@ checkpoints/
 /output*
 /try_*
 epoch*
+/coco
