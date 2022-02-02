@@ -35,7 +35,7 @@ parser.add_argument('--waitforkeys',action="store_true", help="If true, it will 
 parser.add_argument('--turntable',action="store_true", help="If true, show turn table views")
 parser.add_argument('--multi',action="store_true", help='If True, show all available fitting people per image. Default, visualize a single person at each time')
 args = parser.parse_args()
-
+captions=[]
 def conv_3djoint_2djoint(smpl_joints_3d_vis, imgshape):
 
     smpl_joints_2d_vis = smpl_joints_3d_vis[:,:2]       #3D is in camera comaera coordinate with origin on the image center
@@ -44,7 +44,7 @@ def conv_3djoint_2djoint(smpl_joints_3d_vis, imgshape):
 
     return smpl_joints_2d_vis
 
-def visEFT_singleSubject(renderer, eft_data_all):
+def visEFT_singleSubject(renderer, eft_data_all, real=False):
 
     MAGNIFY_RATIO = 3           #onbbox only. To magnify the rendered image size 
 
@@ -223,12 +223,18 @@ def visEFT_singleSubject(renderer, eft_data_all):
                 os.mkdir(args.render_dir)
             #render_output_path = args.render_dir + '/render_{}_eft{:08d}.jpg'.format(imgName[:-4],idx)
             #render_output_path = args.render_dir + '/' + eft_data['imageName']
-            render_output_path = args.render_dir + '/' + 'smaple_' + str(idx) + '.jpg'
-            #print(f"Save to {render_output_path}")
-            print(eft_data['caption'])
-            print(idx)
-            print("=====================================================")
-            cv2.imwrite(render_output_path, saveImg)
+            if not real:
+                render_output_path = args.render_dir + '/' + 'smaple_' + str(idx) + '.jpg'
+                #print(f"Save to {render_output_path}")
+                #print(eft_data['caption'])
+                #print(idx)
+                captions.append(str(idx) + ": " + eft_data['caption'])
+                #print("=====================================================")
+                cv2.imwrite(render_output_path, saveImg)
+            else:
+                render_output_path = args.render_dir + '/' + 'smaple_' + str(idx) + '_real.jpg'                
+                cv2.imwrite(render_output_path, saveImg)
+
         
 
 if __name__ == '__main__':
@@ -240,5 +246,12 @@ if __name__ == '__main__':
     with open('./demo/eft_50.json','r') as f:
         eft_all_with_caption = json.load(f)
         eft_all_with_caption = eft_all_with_caption[:200]
+    with open('./demo/eft_50_real.json','r') as f:
+        eft_all_with_caption_real = json.load(f)
+        eft_all_with_caption_real = eft_all_with_caption_real[:200]
     visEFT_singleSubject(renderer,eft_all_with_caption)
+    visEFT_singleSubject(renderer,eft_all_with_caption_real, real = True)
+    with open("./sample_caps.txt", "w") as fhandle:
+        for line in captions:
+            fhandle.write(f'{line}\n')
 

@@ -16,11 +16,11 @@ __C.SHARE_ENC = True
 __C.CUDA = True
 __C.USE_TENSORBOARD = True
 
-__C.START_FROM_EPOCH = 6501#200
+__C.START_FROM_EPOCH = 0#200
 __C.END_IN_EPOCH = 25000#1200
 __C.CHKPT_PATH = project_dir + '/models/checkpoints'
 __C.TB_DIR = project_dir + '/output/tensorboard'
-__C.SAVE_MODEL_ITR = 1000
+__C.SAVE_MODEL_ITR = 63
 
 # training
 __C.N_BATCH_TRAIN_G = 1# train discriminator k times before training generator
@@ -41,8 +41,8 @@ __C.WORKERS = 2
 __C.JOINT_NUM = 24
 __C.MAX_SENTENCE_LEN = 10
 
-__C.D_WORD_VEC = 256
-__C.D_WORD_VEC_COMPRESS = 72
+__C.D_WORD_VEC = 128
+__C.D_WORD_VEC_COMPRESS = 128
 __C.NOISE_SIZE = __C.D_WORD_VEC
 
 

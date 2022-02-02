@@ -7,7 +7,7 @@ from models.layers import EncoderLayer, DecoderLayer, LinearDecoderLayer
 from models.sublayers import PositionalEncoder, LinearWithChannel, MultiHeadAttention, PositionwiseFeedForward
 
 class Encoder(nn.Module):
-    def __init__(self, n_layers=4, d_model=144, d_inner_scale=4, n_head=8, 
+    def __init__(self, n_layers=4, d_model=128, d_inner_scale=4, n_head=8, 
                 d_k=32, d_v=32, dropout=0.1, scale_emb=False):
         super().__init__()
         self.scale_emb = scale_emb

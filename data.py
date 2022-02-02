@@ -1,3 +1,4 @@
+from unicodedata import category
 import fasttext
 import fasttext.util
 import numpy as np
@@ -42,43 +43,22 @@ def getEFTCaption(cfg):
         eft_data_all = eft_data['data']    
     return eft_data_all
 
-def get_textModel(cfg, device):
-    # load text model
-    print("Loading text model")
-    """
-    text_model = fasttext.load_model(cfg.TEXT_MODEL_PATH) 
-    if  cfg.D_SENTENCE_VEC < 300:
-        fasttext.util.reduce_model(text_model, cfg.D_SENTENCE_VEC)
-    """
-    text_encoder = RNN_ENCODER()
-    state_dict = torch.load('/media/remote_home/chang/z_master-thesis/coco/text_encoder100.pth', map_location=lambda storage, loc: storage)
-    text_encoder.load_state_dict(state_dict)
-    text_encoder.to(device)
-
-    for p in text_encoder.parameters():
-        p.requires_grad = False
-    text_encoder.eval()   
-    print("Text model loaded")
-    return text_encoder
-
 def getData(cfg, device):
     # load coco  
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
-    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)
-    # load text model
-    text_model = get_textModel(cfg, device)
+    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)    
     # load eft data
     eft_data_all = getEFTCaption(cfg)        
     # get the dataset (single person, with captions)
     train_size = int(len(eft_data_all))
     print("dataset size: ", train_size)
     print("Creating dataset_train")
-    dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint, text_model=text_model)
+    dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint)
     print("Creating dataset_val")
-    dataset_val = TheDataset(cfg, eft_data_all[int(train_size*0.9):train_size], coco_caption, coco_keypoint, text_model=text_model)
+    dataset_val = TheDataset(cfg, eft_data_all[int(train_size*0.9):train_size], coco_caption, coco_keypoint)
     print("Datasets created")
     #return text_model, dataset, dataset_val, data_loader#, text_match_val, label_val
-    return text_model, eft_data_all, dataset_train, dataset_val
+    return eft_data_all, dataset_train, dataset_val
 
 def saveImgOrNot(caption):
     save_this = False
@@ -95,7 +75,7 @@ def saveImgOrNot(caption):
     
 
 class TheDataset(torch.utils.data.Dataset):
-    def __init__(self, cfg, eft_data_all, coco_caption, coco_keypoint, text_model=None, val=False):
+    def __init__(self, cfg, eft_data_all, coco_caption, coco_keypoint, val=False):
         self.dataset = []
         self.cfg = cfg
         previous_img_ids = []
@@ -126,34 +106,38 @@ class TheDataset(torch.utils.data.Dataset):
             caption_ids = coco_caption.getAnnIds(imgIds=img_id)
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             
-            save_this, category = saveImgOrNot(captions_anns[0]['caption'])
+            """save_this, category = saveImgOrNot(captions_anns[0]['caption'])
             if not save_this:
-                continue            
-            
+                continue  """  
+            category = 0      
+            data = {'captions': [],
+                    'caption_masks': [],
+                    'caption_lens': [],
+                    'parm_pose': eft_data_all[i]['parm_pose'],
+                    'parm_shape': eft_data_all[i]['parm_shape'],
+                    'smpltype': eft_data_all[i]['smpltype'],
+                    'annotId': eft_data_all[i]['annotId'],
+                    'imageName': eft_data_all[i]['imageName'],
+                    'category': category}
+            data['rot_vec'] = np.array([rotation2so3(R) for R in data['parm_pose']]) 
             kk = np.where(self.filenames == eft_data_all[i]['imageName'][:-4]) # remove ".jpg"
-            for gg in range(2):  
-                data = {'parm_pose': eft_data_all[i]['parm_pose'],
-                        'parm_shape': eft_data_all[i]['parm_shape'],
-                        'smpltype': eft_data_all[i]['smpltype'],
-                        'annotId': eft_data_all[i]['annotId'],
-                        'imageName': eft_data_all[i]['imageName'],
-                        'category': category}
-                data['rot_vec'] = np.array([rotation2so3(R) for R in data['parm_pose']])              
+            for gg in range(5):                               
                 # 82783個filename 每個file有5個caption
                 new_sent_ix = kk[0][0] * 5 + gg
-                data['caption'] =  self.captions[new_sent_ix]
-                caption_len = len(data['caption'])  
-                if 10-caption_len >= 0:       
+                # 這裡的self.captions是已經建好的字典 caption是對應到裡面的 index 而不是真正的字
+                caption = self.captions[new_sent_ix]
+                if 10-len(caption) > 0:  
+                    caption = np.pad(caption, (0, 24-len(caption)))
+                    #caption = np.expand_dims(caption, axis=0).transpose(1,0)  
+                    data['captions'].append(caption) 
                     mask = []
-                    for _ in range(len(data['caption'])):
+                    for _ in range(len(caption)):
                         mask.append(1)
-                    for _ in range(len(data['caption']), 24):
+                    for _ in range(len(caption), 24):
                         mask.append(0)
                     mask = np.array(mask)
-                    data['caption'] = np.pad(data['caption'], (0, 24-caption_len))
-                    data['caption'] = np.expand_dims(data['caption'], axis=0).transpose(1,0)
-                    data['caption_len'] = caption_len
-                    data['caption_mask'] = mask
+                    data['caption_masks'].append(mask)                    
+                    data['caption_lens'].append(len(caption))
                     self.dataset.append(data)
     
     def __len__(self):
@@ -164,50 +148,17 @@ class TheDataset(torch.utils.data.Dataset):
         item = dict()
         item['rot_vec'] = torch.tensor(data['rot_vec'], dtype=torch.float32)
         item['rot_vec_wrong']= torch.tensor(self.get_rot_vec_wrong(index), dtype=torch.float32)
-        item['caption'] = torch.tensor(data['caption'])
-        item['caption_len'] = torch.tensor(data['caption_len'])
-        item['caption_mask'] = torch.tensor(data['caption_mask'])
+        item['caption'], item['caption_mask'] = self.get_caption(data)
         return item
     
-    def get_caption_index(self, imageName):
-        kk = np.where(self.filenames == imageName[:-4]) # remove ".jpg"
-        sent_ix = random.randint(0, 5-1)
-        # 82783個filename 每個file有5個caption
-        new_sent_ix = kk[0][0] * 5 + sent_ix
-        caption_index = self.captions[new_sent_ix]
-        if 10-len(caption_index) < 0:
-            print(gfhfghfg)
-        caption_len = len(caption_index)        
-        mask = []
-        for _ in range(len(caption_index)):
-            mask.append(1)
-        for _ in range(len(caption_index), 24):
-            mask.append(0)
-        mask = np.array(mask)
-        caption_index = np.pad(caption_index, (0, 24-len(caption_index)))
-        caption_index = np.expand_dims(caption_index, axis=0)
+    def get_caption(self, data):
+        sent_ix = random.randint(0, len(data['captions'])-1)        
+        return torch.tensor(data['captions'][sent_ix]), torch.tensor(data['caption_masks'][sent_ix])
 
-        return torch.tensor(caption_index.transpose(1,0)), torch.tensor(caption_len), torch.tensor(mask)
-    
     # get a batch of random rot_vec from the whole dataset    
     def get_rot_vec_wrong(self, index):
-        """others = list(range(0, index-5)) + list(range(index+1+5, len(self.dataset)))
-        data_random = self.dataset[random.choice(others)]
-        return data_random['rot_vec']"""
         while True:
             data_random = self.dataset[random.choice(list(range(0, len(self.dataset))))]
-            if data_random['category'] != self.dataset[index]['category']:
+            #if data_random['category'] != self.dataset[index]['category']:
+            if True:
                 return data_random['rot_vec']
-        """data_randoms = [self.dataset[random.choice(others)]['rot_vec'] for i in range(40)]
-        return np.sum(data_randoms, axis=0)/40"""
-
-    # get a batch of random interpolated caption sentence vectors from the whole dataset
-    # not sure if it makes sense to use "or" for mask
-    def get_interpolated_text(self, beta, f_mask = lambda x,y: [1 if x[i] or y[i] else 0 for i in range(len(x))]):
-        index1 = random.randint(0, len(self.dataset)-1)  # randint(a, b) （a <= N <= b）
-        index2 = random.randint(0, len(self.dataset)-1)
-        vector1 = self.dataset[index1]['vector']
-        vector2 = self.dataset[index2]['vector']
-        mask = f_mask(self.dataset[index1]['vec_mask'], self.dataset[index2]['vec_mask'])
-        # interpolate caption sentence vectors
-        return beta * vector1 + (1 - beta) * vector2, np.array(mask)

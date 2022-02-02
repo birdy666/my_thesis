@@ -15,7 +15,7 @@ if __name__ == "__main__":
     checkpoint = None
     if cfg.START_FROM_EPOCH > 0:
         checkpoint = torch.load(cfg.CHKPT_PATH + "/epoch_" + str(cfg.START_FROM_EPOCH-1) + ".chkpt", map_location='cpu')
-    text_model, eft_all_with_caption, dataset_train, dataset_val = getData(cfg, device)    
+    eft_all_with_caption, dataset_train, dataset_val = getData(cfg, device)    
     net_g, net_d = getModels(cfg, device, checkpoint) 
 
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, drop_last=True)
@@ -28,5 +28,5 @@ if __name__ == "__main__":
         torch.optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=cfg.WEIGHT_DECAY_D),
         lr_mul=2.0, d_model=300, n_warmup_steps=cfg.N_WARMUP_STEPS_D, n_steps=checkpoint['n_steps_d'] if checkpoint!=None else 0)    
     print(device)
-    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, dataLoader_val, text_model)
+    train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, dataLoader_val)
     

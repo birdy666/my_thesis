@@ -15,21 +15,6 @@ algorithm = 'wgan-gp'
 # weight clipping (WGAN)
 c = 1
 
-def prepare_data(data, device):
-    caption, caption_mask, caption_len, rot_vec = data
-    # sort data by the length in a decreasing order
-    sorted_cap_lens, sorted_cap_indices = \
-        torch.sort(caption_len, 0, True)
-
-    caption = caption[sorted_cap_indices].squeeze()
-    rot_vec = rot_vec[sorted_cap_indices]
-    caption_mask = caption_mask[sorted_cap_indices]
-    
-    caption = Variable(caption).to(device)
-    sorted_cap_lens = Variable(sorted_cap_lens).to(device)
-
-    return [caption, caption_mask, sorted_cap_lens, rot_vec]
-
 def get_grad_penalty(batch_size, device, net_d, rot_vec_real, rot_vec_fake, caption_emb, caption_mask):  
     epsilon = torch.rand(batch_size, dtype=torch.float32).to(device)  
     ##########################
@@ -56,9 +41,6 @@ def get_d_score(rot_vec_d):
     pred = F.normalize(rot_vec_d*rot_vec_d, p=1, dim=-1)[:,:,:1]
     return pred.mean()
 
-def get_g_rot_vec(output):
-    return output
-
 def pad_text(text, d_word_vec):
     batch_s = text.size(0)
     new_text = torch.zeros((batch_s,24,d_word_vec), dtype=torch.float32)
@@ -70,25 +52,16 @@ def pad_text(text, d_word_vec):
         
     return new_text
 
-def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, update_d=True, text_model=None):
+def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, update_d=True):
     if update_d:
         net_d.zero_grad()    
 
     # get rot_vec, text vectors and noises
     caption = batch.get('caption').to(device)
-    caption_len = batch.get('caption_len').to(device)
     rot_vec_real = batch.get('rot_vec').to(device) # torch.Size([128, 24, 3])
     rot_vec_wrong = batch.get('rot_vec_wrong').to(device)
     caption_mask = batch.get('caption_mask').to(device)
-    caption, caption_mask, caption_len, rot_vec_real = prepare_data((caption, caption_mask, caption_len, rot_vec_real), device)
-    if text_model == None:
-        print(dfsdf)
-    hidden = text_model.init_hidden(cfg.BATCH_SIZE)
-    # words_embs: batch_size x nef x seq_len
-    # sent_emb: batch_size x nef
-    words_embs, _ = text_model(caption, caption_len, hidden)
-    caption_emb = words_embs.detach().to(device)
-    caption_emb = pad_text(caption_emb, cfg.D_WORD_VEC).to(device)
+    
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     grad_penalty_fake = 0
     grad_penalty_wrong = 0
@@ -103,41 +76,24 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
             rot_vec_fake = get_g_rot_vec(net_g(text_match, caption_mask, noise).detach())
             score_fake = net_d(text_match, caption_mask, rot_vec_fake).detach()
 
-    if update_d: 
-        for _ in range(cfg.N_TRAIN_ENC):
-            score_right = get_d_score(net_d(caption_emb, caption_mask, rot_vec_real))
-            # so3 wrong
-            score_wrong = get_d_score(net_d(caption_emb, caption_mask, rot_vec_wrong))            
-            
-            #grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_wrong, text_match, text_match_mask)
-            loss_d_rw = score_wrong - score_right
-            loss_d_rw.backward()
-            optimizer_d.step_and_update_lr()
-            net_d.zero_grad()
-        if batch_index % cfg.N_TRAIN_ENC_1_TRAIN_D == 0:
-            net_d.zero_grad()
-            """for p in net_d.encoder.parameters():
-                p.requires_grad=False"""
-            score_right = get_d_score(net_d(caption_emb, caption_mask, rot_vec_real))
-            enc_output = net_d.encoder(net_d.compress(caption_emb).detach(), caption_mask).detach()
-            rot_vec_fake = get_g_rot_vec(net_g(enc_output, caption_mask, noise).detach())
-            score_fake = get_d_score(net_d(caption_emb, caption_mask, rot_vec_fake))
-            
-            grad_penalty_fake = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, rot_vec_real, rot_vec_fake, caption_emb, caption_mask)
-            loss_d_rf = score_fake  - score_right + cfg.PENALTY_WEIGHT_FAKE * grad_penalty_fake 
-            loss_d_rf.backward()
-            optimizer_d.step_and_update_lr()
-            """for p in net_d.encoder.parameters():
-                p.requires_grad=True"""
-        """score_right = get_d_score(net_d(caption_emb, caption_mask, rot_vec_real))
-        score_wrong = get_d_score(net_d(caption_emb, caption_mask, rot_vec_wrong))
-        rot_vec_fake = get_g_rot_vec(net_g(caption_emb, caption_mask, noise).detach())
-        score_fake = get_d_score(net_d(caption_emb, caption_mask, rot_vec_fake)) 
-            
-        grad_penalty_fake = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, rot_vec_real, rot_vec_fake, caption_emb, caption_mask)
-        loss_d = score_fake + score_wrong  - 2*score_right + 0.1 * grad_penalty_fake
+    if update_d:
+        score_right = get_d_score(net_d(caption, caption_mask, rot_vec_real))
+        # so3 wrong
+        score_wrong = get_d_score(net_d(caption, caption_mask, rot_vec_wrong))            
+        rot_vec_fake = net_g(caption, caption_mask, noise)
+        score_fake = get_d_score(net_d(caption, caption_mask, rot_vec_fake.detach()))
+        #grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_wrong, text_match, text_match_mask)
+        loss_d = (score_wrong+score_fake)/2.0 - score_right
+        optimizer_d.zero_grad()
         loss_d.backward()
-        optimizer_d.step_and_update_lr()"""
+        optimizer_d.step_and_update_lr()
+
+
+        grad_penalty_fake = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, rot_vec_real, rot_vec_fake, caption, caption_mask)
+        d_loss_gp = 0.01 * grad_penalty_fake
+        optimizer_d.zero_grad()
+        d_loss_gp.backward()
+        optimizer_d.step_and_update_lr()
     else:
         grad_penalty_fake = 0
         grad_penalty_wrong = 0
@@ -146,32 +102,21 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
         net_d.zero_grad()     
     return score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong
 
-def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True, text_model=None):
+def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True):
     if update_g:
         net_g.zero_grad()
     # get rot_vec, text vectors and noises
     caption = batch.get('caption').to(device)
-    caption_len = batch.get('caption_len').to(device)
-    rot_vec_real = batch.get('rot_vec').to(device) # torch.Size([128, 24, 3])
     caption_mask = batch.get('caption_mask').to(device)
-    caption, caption_mask, caption_len, rot_vec_real = prepare_data((caption, caption_mask, caption_len, rot_vec_real), device)
-    if text_model == None:
-        print(dfsdf)
-    hidden = text_model.init_hidden(cfg.BATCH_SIZE)
-    # words_embs: batch_size x nef x seq_len
-    # sent_emb: batch_size x nef
-    words_embs, _ = text_model(caption, caption_len, hidden)
-    caption_emb = words_embs.detach()
-    caption_emb = pad_text(caption_emb, cfg.D_WORD_VEC).to(device)
+    #caption, caption_mask, caption_len, rot_vec_real = prepare_data((caption, caption_mask, caption_len, rot_vec_real), device)
+    
     # get text vectors and noises
     noise1 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
-    noise2 = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
 
     if update_g:
         # rot_vec fake
-        enc_output = net_d.encoder(net_d.compress(caption_emb).detach(), caption_mask).detach()
-        rot_vec_fake = get_g_rot_vec(net_g(enc_output, caption_mask, noise1))
-        score_fake = get_d_score(net_d(caption_emb, caption_mask, rot_vec_fake))
+        rot_vec_fake = net_g(caption, caption_mask, noise1)
+        score_fake = get_d_score(net_d(caption, caption_mask, rot_vec_fake))
         
         # 'wgan', 'wgan-gp'
         loss_g = - (score_fake)
@@ -189,23 +134,19 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
     score_interpolated = 0
     return score_fake, score_interpolated
 
-def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, tb_writer=None, e=None, text_model=None):
+def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, tb_writer=None, e=None):
     print('learning rate: g ' + str(optimizer_g._optimizer.param_groups[0].get('lr')) + ' d ' + str(optimizer_d._optimizer.param_groups[0].get('lr')))
     net_d.train()
     net_g.train()  
     total_loss_g = 0
     total_loss_d = 0
-    for p in net_d.encoder.parameters():
-        p.requires_grad=False
-    for p in net_d.compress.parameters():
-        p.requires_grad=False
 
     for i, batch in enumerate(tqdm(dataLoader_train, desc='  - (Training)   ', leave=False)):        
         ###############################################################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###############################################################
         if i % cfg.N_BATCH_TRAIN_D == 0:
-            score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, i, optimizer_d, text_model=text_model)         
+            score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, i, optimizer_d)         
             loss_d = cfg.SCORE_FAKE_WEIGHT_D * score_fake + cfg.SCORE_WRONG_WEIGHT_D * score_wrong \
                     - cfg.SCORE_RIGHT_WEIGHT_D * score_right 
             if i % cfg.N_TRAIN_ENC ==0:
@@ -218,18 +159,12 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
         # after training discriminator for N times, train gernerator for 1 time
-        if i % cfg.N_BATCH_TRAIN_G == 0:
-            """if cfg.SHARE_ENC:
-                for p in net_g.encoder.parameters():
-                    p.requires_grad=False"""
+        if i % cfg.N_BATCH_TRAIN_G == 0:            
             for _ in range(cfg.N_TRAIN_G):
                 #get losses
-                score_fake, score_interpolated= get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g, text_model=text_model)
+                score_fake, score_interpolated= get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
                 loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G*score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G*score_interpolated)
                 total_loss_g += loss_g.item()
-            """if cfg.SHARE_ENC:
-                for p in net_g.encoder.parameters():
-                    p.requires_grad=True     """
             if tb_writer != None:
                 tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*len(dataLoader_train)+i)
     return total_loss_g/ (cfg.BATCH_SIZE/cfg.N_BATCH_TRAIN_G/cfg.N_TRAIN_G), total_loss_d/(cfg.BATCH_SIZE*cfg.N_BATCH_TRAIN_D)
@@ -254,7 +189,7 @@ def val_epoch(cfg, device, net_g, net_d, dataLoader_val):
         total_loss_g += loss_g.item()
     return total_loss_g, total_loss_d   
 
-def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, dataLoader_val, text_model):   
+def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, dataLoader_val):   
     # tensorboard
     if cfg.USE_TENSORBOARD:
         print("[Info] Use Tensorboard")  
@@ -265,7 +200,7 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train,
         print("=====================Epoch " + str(e) + " start!=====================")     
         # Train!!
         start = time.time()
-        train_loss_g, train_loss_d = train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, tb_writer,e , text_model=text_model)
+        train_loss_g, train_loss_d = train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, tb_writer, e)
         
         lr_g=optimizer_g._optimizer.param_groups[0].get('lr')
         lr_d=optimizer_d._optimizer.param_groups[0].get('lr')
