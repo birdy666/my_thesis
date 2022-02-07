@@ -15,25 +15,23 @@ algorithm = 'wgan-gp'
 # weight clipping (WGAN)
 c = 1
 
-def get_grad_penalty(batch_size, device, net_d, rot_vec_real, rot_vec_fake, caption_emb, caption_mask):  
-    epsilon = torch.rand(batch_size, dtype=torch.float32).to(device)  
-    ##########################
-    # get rot_vec_interpolated
-    ##########################
-    fake_interpolated = torch.empty_like(rot_vec_real, dtype=torch.float32).to(device) 
-    for j in range(batch_size):
-        fake_interpolated[j] = epsilon[j] * rot_vec_real[j] + (1 - epsilon[j]) * rot_vec_fake[j]
-    
-    fake_interpolated = Variable(fake_interpolated, requires_grad=True)    
+def get_grad_penalty(batch_size, device, net_d, rot_vec_real, rot_vec_fake, caption, caption_mask):  
+        
+    interpolated = Variable(rot_vec_real, requires_grad=True)  
+    caption_emb =  net_d.embedding(caption)
     # calculate gradient penalty
-    score_interpolated_fake = get_d_score(net_d(caption_emb, caption_mask, fake_interpolated))
-    gradient_fake = grad(outputs=score_interpolated_fake, 
-                    inputs=fake_interpolated, 
+    score_interpolated_fake = get_d_score(net_d(caption_emb, caption_mask, interpolated))
+    grads = grad(outputs=score_interpolated_fake, 
+                    inputs=(interpolated, caption_emb), 
                     grad_outputs=torch.ones_like(score_interpolated_fake).to(device),
                     create_graph=True, 
-                    retain_graph=True)[0]
-    grad_fake_norm = torch.sqrt(torch.sum(gradient_fake.reshape(batch_size, -1) ** 2, dim=1) + 1e-5)
-    grad_penalty_fake = ((grad_fake_norm - 1) ** 2).mean()  
+                    retain_graph=True,
+                    only_inputs=True)
+    grad0 = grads[0].reshape(grads[0].size(0), -1)
+    grad1 = grads[1].reshape(grads[1].size(0), -1)
+    grad01 = torch.cat((grad0,grad1),dim=1)        
+    grad_fake_norm = torch.sqrt(torch.sum(grad01.reshape(batch_size, -1) ** 2, dim=1) + 1e-5)
+    grad_penalty_fake = (grad_fake_norm).mean()  
     return grad_penalty_fake
 
 def get_d_score(rot_vec_d):
@@ -77,20 +75,25 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
             score_fake = net_d(text_match, caption_mask, rot_vec_fake).detach()
 
     if update_d:
-        score_right = get_d_score(net_d(caption, caption_mask, rot_vec_real))
-        # so3 wrong
-        score_wrong = get_d_score(net_d(caption, caption_mask, rot_vec_wrong))            
+        # right
+        caption_emb_r = net_d.embedding(caption)
+        score_right = get_d_score(net_d(caption_emb_r, caption_mask, rot_vec_real))
+        # wrong
+        caption_emb_w = net_d.embedding(caption)
+        score_wrong = get_d_score(net_d(caption_emb_w, caption_mask, rot_vec_wrong)) 
+        # fake           
         rot_vec_fake = net_g(caption, caption_mask, noise)
-        score_fake = get_d_score(net_d(caption, caption_mask, rot_vec_fake.detach()))
+        caption_emb_f = net_d.embedding(caption).detach()
+        score_fake = get_d_score(net_d(caption_emb_f, caption_mask, rot_vec_fake.detach()))
         #grad_penalty_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, so3_real, so3_wrong, text_match, text_match_mask)
-        loss_d = (score_wrong+score_fake)/2.0 - score_right
+        loss_d = (2*score_wrong+score_fake)/3.0 - score_right
         optimizer_d.zero_grad()
         loss_d.backward()
         optimizer_d.step_and_update_lr()
 
 
         grad_penalty_fake = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, rot_vec_real, rot_vec_fake, caption, caption_mask)
-        d_loss_gp = 0.01 * grad_penalty_fake
+        d_loss_gp = 10 * grad_penalty_fake
         optimizer_d.zero_grad()
         d_loss_gp.backward()
         optimizer_d.step_and_update_lr()
@@ -116,10 +119,12 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
     if update_g:
         # rot_vec fake
         rot_vec_fake = net_g(caption, caption_mask, noise1)
-        score_fake = get_d_score(net_d(caption, caption_mask, rot_vec_fake))
+        caption_emb_f = net_d.embedding(caption)
+        score_fake = get_d_score(net_d(caption_emb_f, caption_mask, rot_vec_fake))
         
         # 'wgan', 'wgan-gp'
         loss_g = - (score_fake)
+        optimizer_g.zero_grad()
         loss_g.backward()
         optimizer_g.step_and_update_lr()
     else:
@@ -159,12 +164,11 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_
         # (2) Update G network: maximize log(D(G(z)))
         ###############################################################
         # after training discriminator for N times, train gernerator for 1 time
-        if i % cfg.N_BATCH_TRAIN_G == 0:            
-            for _ in range(cfg.N_TRAIN_G):
-                #get losses
-                score_fake, score_interpolated= get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
-                loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G*score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G*score_interpolated)
-                total_loss_g += loss_g.item()
+        if e >= cfg.D_WARMUP :  
+            #get losses
+            score_fake, score_interpolated= get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g)
+            loss_g =  - (cfg.SCORE_FAKE_WEIGHT_G*score_fake + cfg.SCORE_INTERPOLATE_WEIGHT_G*score_interpolated)
+            total_loss_g += loss_g.item()
             if tb_writer != None:
                 tb_writer.add_scalars('loss_g_', {'score_fake': score_fake, 'score_interpolated': score_interpolated}, e*len(dataLoader_train)+i)
     return total_loss_g/ (cfg.BATCH_SIZE/cfg.N_BATCH_TRAIN_G/cfg.N_TRAIN_G), total_loss_d/(cfg.BATCH_SIZE*cfg.N_BATCH_TRAIN_D)

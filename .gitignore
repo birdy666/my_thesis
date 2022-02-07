@@ -8,3 +8,5 @@ checkpoints/
 /try_*
 epoch*
 /coco
+visualization*
+glRenderer*

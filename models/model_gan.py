@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-from models.transformer import Encoder, Decoder, LinearDecoder
+from models.transformer import Encoder, Decoder
 from models.sublayers import LinearWithChannel, MultiHeadAttention
 
 def getModels(cfg, device, checkpoint=None):
@@ -24,7 +24,14 @@ def getModels(cfg, device, checkpoint=None):
                             d_v=cfg.ENC_PARAM_D.d_v, 
                             dropout=cfg.ENC_PARAM_D.dropout, 
                             scale_emb=cfg.ENC_PARAM_D.scale_emb)
-    decoder_g = LinearDecoder(cfg.ENC_PARAM_G.d_model)    
+    decoder_g = Decoder(n_layers=cfg.DEC_PARAM_G.n_layers, 
+                            d_model=cfg.DEC_PARAM_G.d_model, 
+                            d_inner_scale=cfg.DEC_PARAM_G.d_inner_scale, 
+                            n_head=cfg.DEC_PARAM_G.n_head, 
+                            d_k=cfg.DEC_PARAM_G.d_k, 
+                            d_v=cfg.DEC_PARAM_G.d_v, 
+                            dropout=cfg.DEC_PARAM_G.dropout, 
+                            scale_emb=cfg.DEC_PARAM_G.scale_emb)    
     decoder_d = Decoder(n_layers=cfg.DEC_PARAM_D.n_layers, 
                             d_model=cfg.DEC_PARAM_D.d_model, 
                             d_inner_scale=cfg.DEC_PARAM_D.d_inner_scale, 
@@ -61,13 +68,13 @@ class Generator(nn.Module):
         self.device = device
         self.d_vec = d_vec
         self.noise_weight = noise_weight
+        self.fcc = nn.Linear(self.d_vec,24*3)
 
     def forward(self, captions, input_mask, noise):
         emb = self.dropout_1(self.embedding(captions))
         enc_output = self.encoder(enc_input=emb, enc_mask=input_mask)
-        x = torch.ones_like(enc_output, dtype=torch.float32).to(self.device)       
-        output = self.decoder(x,enc_output,mask=input_mask.unsqueeze(-2))
-        return  output
+        output = self.decoder(noise,enc_output,mask=input_mask.unsqueeze(-2))
+        return  self.fcc(output).view(-1,24,3)
 
 class Discriminator(nn.Module):
     def __init__(self, encoder, decoder, device, d_vec, noise_weight):
@@ -80,22 +87,18 @@ class Discriminator(nn.Module):
 
         self.encoder = encoder
         self.decoder = decoder
-        self.fcc = LinearWithChannel(self.d_vec,2,24)
+        self.fc1 = nn.Linear(24*3,d_vec)
+        self.fc2 = nn.Linear(d_vec,2)
         
-    def forward(self, captions, input_mask, rot_vec):
-        batch_size = captions.size(0)
+    def forward(self, captions_emb, input_mask, rot_vec):
+        batch_size = captions_emb.size(0)
         noise_tensor = torch.randn((batch_size, 24, 3), dtype=torch.float32).to(self.device)        
         rot_vec = rot_vec + self.noise_weight*noise_tensor
 
-        emb = self.dropout_1(self.embedding(captions))
+        emb = self.dropout_1(captions_emb)
         # encoder output        
         enc_output = self.encoder(enc_input=emb, enc_mask=input_mask)
         # decoder output
-        dec_output = self.decoder(enc_output, 
-                                enc_mask=input_mask, 
-                                dec_input=F.pad(rot_vec,(0,self.d_vec-3), mode='constant', value=0.0),
-                                #F.pad(rot_vec,(0,self.d_vec-3), mode='constant', value=0.0), 
-                                dec_mask=torch.tensor(np.array([[1]+[1]*23]*batch_size)).to(self.device))
+        output = self.decoder(self.fc1(rot_vec.view(batch_size,1,-1)),enc_output,mask=input_mask.unsqueeze(-2))
         
-        output = self.fcc(dec_output)
-        return output
+        return  self.fc2(output)

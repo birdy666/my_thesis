@@ -20,8 +20,8 @@ from config import cfg
 
 #keywords = ['ski', 'baseball', 'motor','tennis','skateboard','kite']
 #keywords = ['frisbee', 'baseball', 'skateboard', 'surf','skiing']
-keywords = ['baseball', 'skateboard', 'surf','ski']
-not_keywords = ["stand", "sit", "walk", "observ", "parked", "picture", "photo", "post"]
+keywords = ['baseball', 'skateboard', 'surf','ski', 'motor','tennis','frisbee', "sit",'kite']
+not_keywords = ["stand", "walk", "observ", "parked", "picture", "photo", "post"]
 
 #data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
     #data['parm_shape']       #10 dim vector
@@ -108,7 +108,7 @@ class TheDataset(torch.utils.data.Dataset):
             
             """save_this, category = saveImgOrNot(captions_anns[0]['caption'])
             if not save_this:
-                continue  """  
+                continue """
             category = 0      
             data = {'captions': [],
                     'caption_masks': [],
