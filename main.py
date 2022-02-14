@@ -21,12 +21,8 @@ if __name__ == "__main__":
     dataLoader_train = torch.utils.data.DataLoader(dataset_train, batch_size=cfg.BATCH_SIZE, shuffle=True, drop_last=True)
     dataLoader_val = torch.utils.data.DataLoader(dataset_val, batch_size=cfg.BATCH_SIZE, shuffle=False, drop_last=True)
     
-    optimizer_g = ScheduledOptim(
-        torch.optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=cfg.WEIGHT_DECAY_G),
-        lr_mul=2.0, d_model=300, n_warmup_steps=cfg.N_WARMUP_STEPS_G, n_steps=checkpoint['n_steps_g'] if checkpoint!=None else 0)
-    optimizer_d = ScheduledOptim(
-        torch.optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=cfg.WEIGHT_DECAY_D),
-        lr_mul=2.0, d_model=300, n_warmup_steps=cfg.N_WARMUP_STEPS_D, n_steps=checkpoint['n_steps_d'] if checkpoint!=None else 0)    
+    optimizer_g = torch.optim.Adam(net_g.parameters(), lr=cfg.LEARNING_RATE_G, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=0)
+    optimizer_d = torch.optim.Adam(net_d.parameters(), lr=cfg.LEARNING_RATE_D, betas=(cfg.BETA_1, cfg.BETA_2), eps=1e-09, weight_decay=0)
     print(device)
     train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train, dataLoader_val)
     

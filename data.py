@@ -20,7 +20,7 @@ from config import cfg
 
 #keywords = ['ski', 'baseball', 'motor','tennis','skateboard','kite']
 #keywords = ['frisbee', 'baseball', 'skateboard', 'surf','skiing']
-keywords = ['baseball', 'skateboard', 'surf','ski', 'motor','tennis','frisbee', "sit",'kite']
+keywords = ['sit', 'baseball', 'skateboard', 'surf','ski', 'motor','tennis','frisbee', 'kite', 'bicycle', "snowboard"]
 not_keywords = ["stand", "walk", "observ", "parked", "picture", "photo", "post"]
 
 #data['parm_pose']     #24x3x3, 3D rotation matrix for 24 joints
@@ -48,7 +48,7 @@ def getData(cfg, device):
     coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
     coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)    
     # load eft data
-    eft_data_all = getEFTCaption(cfg)        
+    eft_data_all = getEFTCaption(cfg)    
     # get the dataset (single person, with captions)
     train_size = int(len(eft_data_all))
     print("dataset size: ", train_size)
@@ -106,9 +106,9 @@ class TheDataset(torch.utils.data.Dataset):
             caption_ids = coco_caption.getAnnIds(imgIds=img_id)
             captions_anns = coco_caption.loadAnns(ids=caption_ids)
             
-            """save_this, category = saveImgOrNot(captions_anns[0]['caption'])
+            save_this, category = saveImgOrNot(captions_anns[0]['caption'])
             if not save_this:
-                continue """
+                continue
             category = 0      
             data = {'captions': [],
                     'caption_masks': [],
@@ -126,20 +126,25 @@ class TheDataset(torch.utils.data.Dataset):
                 new_sent_ix = kk[0][0] * 5 + gg
                 # 這裡的self.captions是已經建好的字典 caption是對應到裡面的 index 而不是真正的字
                 caption = self.captions[new_sent_ix]
-                if 10-len(caption) > 0:  
+                if cfg.MAX_SENTENCE_LEN-len(caption) > 0:  
                     caption = np.pad(caption, (0, 24-len(caption)))
                     #caption = np.expand_dims(caption, axis=0).transpose(1,0)  
-                    data['captions'].append(caption) 
+                    data['captions'].append(caption)
                     mask = []
                     for _ in range(len(caption)):
                         mask.append(1)
                     for _ in range(len(caption), 24):
                         mask.append(0)
                     mask = np.array(mask)
-                    data['caption_masks'].append(mask)                    
+                    data['caption_masks'].append(mask)               
                     data['caption_lens'].append(len(caption))
-                    self.dataset.append(data)
+                    self.dataset.append(data)    
     
+        print(len(self.dataset))
+        count = [0, 0, 0, 0, 0,0,0, 0,0,0,0]
+        for i in range(len(self.dataset)):
+            count[self.dataset[i]["category"]] += 1
+        print(count)
     def __len__(self):
         return len(self.dataset)
 
@@ -162,3 +167,15 @@ class TheDataset(torch.utils.data.Dataset):
             #if data_random['category'] != self.dataset[index]['category']:
             if True:
                 return data_random['rot_vec']
+
+if __name__ == "__main__":
+    # load coco  
+    coco_caption = COCO(cfg.COCO_CAPTION_TRAIN)
+    coco_keypoint = COCO(cfg.COCO_keypoints_TRAIN)    
+    # load eft data
+    eft_data_all = getEFTCaption(cfg)    
+    # get the dataset (single person, with captions)
+    train_size = int(len(eft_data_all))
+    print("dataset size: ", train_size)
+    print("Creating dataset_train")
+    dataset_train = TheDataset(cfg, eft_data_all[:int(train_size*0.9)], coco_caption, coco_keypoint)

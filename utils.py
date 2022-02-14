@@ -33,7 +33,7 @@ def get_caption_vector(text_model, caption_without_punctuation, max_sentence_len
 # get a batch of noise vectors
 def get_noise_tensor(batch_size, noise_size):
     """batch_size x 24 x noise_size"""
-    noise_tensor = torch.randn((batch_size, 1, noise_size), dtype=torch.float32)
+    noise_tensor = torch.ones((batch_size, 24, noise_size), dtype=torch.float32)
     return noise_tensor
 
 def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
@@ -42,9 +42,8 @@ def print_performances(header, start_time, loss_g, loss_d, lr_g, lr_d, e):
                 e = e, header=f"({header})", loss_g=loss_g,
                 loss_d=loss_d, elapse=(time.time()-start_time)/60, lr_g=lr_g, lr_d=lr_d))
 
-def save_models(cfg, e, net_g, net_d, n_steps_g, n_steps_d, chkpt_path,  save_mode='all'):
-    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(),
-                    'n_steps_g': n_steps_g, 'n_steps_d':n_steps_d, 'cfg':cfg}
+def save_models(cfg, e, net_g, net_d, chkpt_path,  save_mode='all'):
+    checkpoint = {'epoch': e, 'model_g': net_g.state_dict(), 'model_d': net_d.state_dict(), 'cfg':cfg}
 
     if save_mode == 'all':
         torch.save(checkpoint, chkpt_path + "/epoch_" + str(e) + ".chkpt")

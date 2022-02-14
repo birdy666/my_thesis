@@ -49,19 +49,11 @@ def pad_text(text, d_word_vec):
 
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_120' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_62' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
-    ##
-    encoder_g = Encoder(n_layers=cfg.ENC_PARAM_G.n_layers, 
-                            d_model=cfg.ENC_PARAM_G.d_model, 
-                            d_inner_scale=cfg.ENC_PARAM_G.d_inner_scale, 
-                            n_head=cfg.ENC_PARAM_G.n_head, 
-                            d_k=cfg.ENC_PARAM_G.d_k, 
-                            d_v=cfg.ENC_PARAM_G.d_v, 
-                            dropout=cfg.ENC_PARAM_G.dropout, 
-                            scale_emb=cfg.ENC_PARAM_G.scale_emb)
+    
     decoder_g = Decoder(n_layers=cfg.DEC_PARAM_G.n_layers, 
                             d_model=cfg.DEC_PARAM_G.d_model, 
                             d_inner_scale=cfg.DEC_PARAM_G.d_inner_scale, 
@@ -72,7 +64,7 @@ if __name__ == "__main__":
                             scale_emb=cfg.DEC_PARAM_G.scale_emb)    
     
                             
-    net_g = Generator(encoder_g,decoder_g, device, cfg.D_WORD_VEC, cfg.NOISE_WEIGHT_G).to(device)
+    net_g = Generator(decoder_g, cfg.D_WORD_VEC).to(device)
     
     net_g.load_state_dict(checkpoint['model_g'])
 
@@ -99,7 +91,7 @@ if __name__ == "__main__":
     with open(captionpath, 'rb') as f:
         x = pickle.load(f)
         captions = np.array(x[0])
-    for i in tqdm(range(len(eft_data)), desc='  - (Dataset)   ', leave=False):
+    for i in tqdm(range(len(eft_data)), desc='  - (Dataset)   ', leave=True):
         if i > 20000:
             break
         data = {}      
@@ -128,7 +120,7 @@ if __name__ == "__main__":
             caption = captions[new_sent_ix]
             caption_len = len(caption)
             
-            if 10-caption_len <= 0:
+            if 15-caption_len <= 0:
                 continue
             mask = []
             for _ in range(caption_len):
