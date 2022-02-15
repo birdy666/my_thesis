@@ -26,12 +26,12 @@ __C.SAVE_MODEL_ITR = 31
 __C.N_TRAIN_D = 1# train discriminator k times before training generator
 
 __C.BATCH_SIZE = 256
-__C.LEARNING_RATE_G = 5e-5
-__C.LEARNING_RATE_D = 2e-4
+__C.LEARNING_RATE_G = 2e-5
+__C.LEARNING_RATE_D = 1e-4
 __C.WEIGHT_DECAY_G = 0
 __C.WEIGHT_DECAY_D = 0
 __C.NOISE_WEIGHT_G = 0.4
-__C.NOISE_WEIGHT_D = 0.4
+__C.NOISE_WEIGHT_D = 0.2
 
 __C.COMPRESS_SIZE = 128
 __C.WORKERS = 2
@@ -53,16 +53,12 @@ __C.SCORE_RIGHT_WEIGHT_D = r_d/(w_d+f_d+r_d)
 
 # Model g
 n_head = 4
-__C.ENC_PARAM_G = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':n_head, 
-                'd_k':__C.D_WORD_VEC//4, 'd_v':__C.D_WORD_VEC//4, 'dropout':0.1, 'scale_emb':False})
 __C.DEC_PARAM_G = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':n_head, 
                 'd_k':__C.D_WORD_VEC//4, 'd_v':__C.D_WORD_VEC//4, 'dropout':0.1, 'scale_emb':False})
 __C.DROPOUT_G = 0.1
 
 
 # Model d
-__C.ENC_PARAM_D = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':n_head, 
-                'd_k':__C.D_WORD_VEC//4, 'd_v':__C.D_WORD_VEC//4, 'dropout':0.1, 'scale_emb':False})
 __C.DEC_PARAM_D = edict({'n_layers':6, 'd_model':__C.D_WORD_VEC, 'd_inner_scale':4, 'n_head':n_head, 
                 'd_k':__C.D_WORD_VEC//4, 'd_v':__C.D_WORD_VEC//4, 'dropout':0.1, 'scale_emb':False})
 __C.DROPOUT_D = 0.1

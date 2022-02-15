@@ -23,12 +23,14 @@ from models.sublayers import MultiHeadAttention, PositionwiseFeedForward, Linear
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1):
+    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1, selfatt=True):
         super(DecoderLayer, self).__init__()
-        self.slf_attn = MultiHeadAttention(n_head=n_head, d_model=d_model, d_k=d_k, d_v=d_v, dropout=dropout)
-        self.layer_norm_1 = nn.LayerNorm((24, d_model), eps=1e-6)
-        self.pos_ffn_1 = PositionwiseFeedForward(d_model, d_inner, dropout=dropout)
-        self.layer_norm_2 = nn.LayerNorm((24, d_model), eps=1e-6)
+        self.selfatt = selfatt
+        if selfatt:
+            self.slf_attn = MultiHeadAttention(n_head=n_head, d_model=d_model, d_k=d_k, d_v=d_v, dropout=dropout)
+            self.layer_norm_1 = nn.LayerNorm((24, d_model), eps=1e-6)
+            self.pos_ffn_1 = PositionwiseFeedForward(d_model, d_inner, dropout=dropout)
+            self.layer_norm_2 = nn.LayerNorm((24, d_model), eps=1e-6)
 
         self.enc_dec_attn = MultiHeadAttention(n_head=n_head, d_model=d_model, d_k=d_k, d_v=d_v, dropout=dropout)        
         self.layer_norm_3 = nn.LayerNorm(d_model, eps=1e-6)
@@ -36,10 +38,12 @@ class DecoderLayer(nn.Module):
         self.layer_norm_4 = nn.LayerNorm(d_model, eps=1e-6)
 
     def forward(self, dec_input, enc_output, enc_mask):
-        x = self.slf_attn(dec_input, enc_output, enc_output, mask=enc_mask)
-        x = self.layer_norm_1(x)
-        x = self.pos_ffn_1(x)
-        x = self.layer_norm_2(x)
+        x = dec_input
+        if self.selfatt:
+            x = self.slf_attn(x, enc_output, enc_output, mask=enc_mask)
+            x = self.layer_norm_1(x)
+            x = self.pos_ffn_1(x)
+            x = self.layer_norm_2(x)
 
         x = self.enc_dec_attn(x, enc_output, enc_output, mask=enc_mask)
         x = self.layer_norm_3(x)

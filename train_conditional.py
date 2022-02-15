@@ -44,20 +44,6 @@ def get_grad_penalty(batch_size, device, net_d, rot_vec_real, rot_vec_fake, capt
 
     return grad_penalty_fake, grad_penalty_wrong
 
-def get_d_score(rot_vec_d):
-    return rot_vec_d.mean()
-
-def pad_text(text, d_word_vec):
-    batch_s = text.size(0)
-    new_text = torch.zeros((batch_s,24,d_word_vec), dtype=torch.float32)
-    for i in range(batch_s):
-        if len(text[i]) < 24:
-            new_text[i][0:len(text[i])] = text[i]
-            for j in range(len(text[i]), 24):
-                new_text[i][j] = torch.zeros(d_word_vec, dtype=torch.float32).unsqueeze(0)
-        
-    return new_text
-
 def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, update_d=True):
     if update_d:
         net_d.zero_grad()    
@@ -86,7 +72,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
         score_fake = net_d(caption_emb_f, caption_mask, rot_vec_fake.detach()).mean() 
         # GP
         gp_fake, gp_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, rot_vec_real, rot_vec_fake, caption, caption_mask)
-        loss_d = score_wrong + score_fake - 2*score_right + 2*gp_fake + 2*gp_wrong
+        loss_d = score_wrong + score_fake - 2*score_right + 5*gp_fake + 5*gp_wrong
         
         optimizer_d.zero_grad()
         loss_d.backward()
@@ -190,10 +176,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train,
         print("[Info] Use Tensorboard")  
         tb_writer = SummaryWriter(log_dir=cfg.TB_DIR) 
 
-    """for p in net_g.embedding.parameters():
+    for p in net_g.embedding.parameters():
         p.requires_grad = False
     for q in net_d.embedding.parameters():
-        q.requires_grad = False"""
+        q.requires_grad = False
        
     start_of_all_training = time.time()
     for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):   
@@ -238,6 +224,11 @@ if __name__ == "__main__":
 
     print((a@w).size())"""
 
-    a = torch.tensor([[[2,2,2,2,2],[5,5,5,5,5]],[[7,7,7,7,7],[8,8,8,8,8]]], dtype=torch.float32)
+    """a = torch.tensor([[[2,2,2,2,2],[5,5,5,5,5]],[[7,7,7,7,7],[8,8,8,8,8]]], dtype=torch.float32)
     print(a.size())
-    print(a.view(2,-1)**2)
+    print(a.view(2,-1)**2)"""
+    a = torch.tensor([[[2,2,2,2,2],[5,5,5,5,5]],[[7,7,7,7,7],[8,8,8,8,8]]], dtype=torch.float32)
+    b = torch.tensor([1,2]).unsqueeze(0).unsqueeze(-1)
+    print(a.size())
+    print(b.size())
+    print(a*b)

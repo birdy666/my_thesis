@@ -2,13 +2,10 @@ import json
 import copy
 import torch
 from models.model_gan import Generator
-from models.transformer import Encoder, Decoder
+from models.transformer import Decoder
 from config import cfg
-from utils import get_noise_tensor, get_caption_vector
-import string
+from utils import get_noise_tensor
 from pycocotools.coco import COCO
-import fasttext
-import fasttext.util
 from geometry import so32rotation, rotation2so3
 import numpy as np
 from DAMSM import RNN_ENCODER
@@ -49,7 +46,7 @@ def pad_text(text, d_word_vec):
 
 
 if __name__ == "__main__":
-    checkpoint = torch.load('./models/checkpoints/epoch_62' + ".chkpt", map_location=torch.device('cpu')) #in docker
+    checkpoint = torch.load('./models/checkpoints/epoch_217' + ".chkpt", map_location=torch.device('cpu')) #in docker
     #checkpoint = torch.load('/media/remote_home/chang/z_master-thesis/models/checkpoints/epoch_9' + ".chkpt")
     ##
     ## model_gan 得生成器有手寫devise判讀 要手動改 docker時因為不能用CUDA所以沒問題
@@ -61,7 +58,7 @@ if __name__ == "__main__":
                             d_k=cfg.DEC_PARAM_G.d_k, 
                             d_v=cfg.DEC_PARAM_G.d_v, 
                             dropout=cfg.DEC_PARAM_G.dropout, 
-                            scale_emb=cfg.DEC_PARAM_G.scale_emb)    
+                            scale_emb=cfg.DEC_PARAM_G.scale_emb,G=True)    
     
                             
     net_g = Generator(decoder_g, cfg.D_WORD_VEC).to(device)

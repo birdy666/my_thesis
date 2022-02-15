@@ -75,10 +75,14 @@ class PositionwiseFeedForward(nn.Module):
         return x
 
 class PositionalEncoder(nn.Module):
-    def __init__(self, d_hid, n_position=24):
+    def __init__(self, d_hid=128, n_position=24, r=False):
         super(PositionalEncoder, self).__init__()
+        self.r = r
+        if r:
+            self.register_buffer('pos_table', self._get_table(n_position))
         # Not a parameter
-        self.register_buffer('pos_table', self._get_sinusoid_encoding_table(n_position, d_hid))
+        else:
+            self.register_buffer('pos_table', self._get_sinusoid_encoding_table(n_position, d_hid))
 
     def _get_sinusoid_encoding_table(self, n_position, d_hid):
         ''' Sinusoid position encoding table '''
@@ -92,9 +96,21 @@ class PositionalEncoder(nn.Module):
         sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
 
         return torch.FloatTensor(sinusoid_table).unsqueeze(0)
+    
+    def _get_table(self, n_position):
+        table = np.array([i for i in range(n_position)]) / n_position
+        return torch.FloatTensor(table).unsqueeze(0).unsqueeze(-1)
+
+    def _get_table_r(self, n_position):
+        table = np.array([0.1*i for i in range(n_position)]) / n_position
+        return torch.FloatTensor(table).unsqueeze(0).unsqueeze(-1)
+
 
     def forward(self, x):
-        return x + self.pos_table[:, :x.size(1)].clone().detach()
+        if self.r:
+            return x * self.pos_table.clone().detach()
+        else:
+            return x + self.pos_table.clone().detach()
 
 class LinearWithChannel(nn.Module):
     # https://github.com/pytorch/pytorch/issues/36591
