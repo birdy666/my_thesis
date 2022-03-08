@@ -110,7 +110,8 @@ class TheDataset(torch.utils.data.Dataset):
             if not save_this:
                 continue
             category = 0      
-            data = {'captions': [],
+            data = {'texts': [],
+                    'captions': [],
                     'caption_masks': [],
                     'caption_lens': [],
                     'parm_pose': eft_data_all[i]['parm_pose'],
@@ -121,7 +122,7 @@ class TheDataset(torch.utils.data.Dataset):
                     'category': category}
             data['rot_vec'] = np.array([rotation2so3(R) for R in data['parm_pose']]) 
             kk = np.where(self.filenames == eft_data_all[i]['imageName'][:-4]) # remove ".jpg"
-            for gg in range(5):                               
+            for gg in range(5):                  
                 # 82783個filename 每個file有5個caption
                 new_sent_ix = kk[0][0] * 5 + gg
                 # 這裡的self.captions是已經建好的字典 caption是對應到裡面的 index 而不是真正的字
@@ -138,6 +139,7 @@ class TheDataset(torch.utils.data.Dataset):
                     mask = np.array(mask)
                     data['caption_masks'].append(mask)               
                     data['caption_lens'].append(len(caption))
+                    data['texts'].append(captions_anns[gg]['caption'])
                     self.dataset.append(data)    
     
         print(len(self.dataset))
@@ -153,12 +155,18 @@ class TheDataset(torch.utils.data.Dataset):
         item = dict()
         item['rot_vec'] = torch.tensor(data['rot_vec'], dtype=torch.float32)
         item['rot_vec_wrong']= torch.tensor(self.get_rot_vec_wrong(index), dtype=torch.float32)
-        item['caption'], item['caption_mask'] = self.get_caption(data)
+        item['caption'], item['caption_mask'], item['text'] = self.get_caption(data)
+        item['caption_wrong'], item['caption_mask_wrong'] = self.get_caption_wrong(index)
         return item
+
+    def get_caption_wrong(self, index):
+        data_random = self.dataset[random.choice(list(range(0, len(self.dataset))))]
+        sent_ix = random.randint(0, len(data_random['captions'])-1)        
+        return torch.tensor(data_random['captions'][sent_ix]), torch.tensor(data_random['caption_masks'][sent_ix])
     
     def get_caption(self, data):
         sent_ix = random.randint(0, len(data['captions'])-1)        
-        return torch.tensor(data['captions'][sent_ix]), torch.tensor(data['caption_masks'][sent_ix])
+        return torch.tensor(data['captions'][sent_ix]), torch.tensor(data['caption_masks'][sent_ix]), data['texts'][sent_ix]
 
     # get a batch of random rot_vec from the whole dataset    
     def get_rot_vec_wrong(self, index):

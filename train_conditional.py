@@ -10,10 +10,21 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter 
 from utils import get_noise_tensor, print_performances, save_models
 from torch.autograd import Variable
+import json
 
 algorithm = 'wgan-gp'
 # weight clipping (WGAN)
 c = 1
+
+def output_attn(attn_g, attn_d, text):
+    with open("./attention.txt", "w") as fhandle:
+        fhandle.write(f'{text[0]}\n')
+    with open('./attention.json', 'w') as outfile:
+        attn_g = np.around(attn_g[0].detach().cpu().numpy().astype(float),3).tolist()
+        attn_d = np.around(attn_d[0].detach().cpu().numpy().astype(float),3).tolist()
+        json.dump({'attn_g':attn_g, 'attn_d':attn_d}, outfile)
+    
+
 
 def get_grad_penalty(batch_size, device, net_d, rot_vec_real, rot_vec_fake, caption, caption_mask):  
     epsilon = torch.rand(batch_size, dtype=torch.float32).to(device)  
@@ -26,7 +37,8 @@ def get_grad_penalty(batch_size, device, net_d, rot_vec_real, rot_vec_fake, capt
     interpolated = Variable(fake_interpolated, requires_grad=True)
     caption_emb =  Variable(net_d.embedding(caption), requires_grad=True)
     # calculate gradient penalty
-    score_interpolated_fake = net_d(caption_emb, caption_mask, interpolated).mean()
+    score_interpolated_fake, _ = net_d(caption_emb, caption_mask, interpolated)
+    score_interpolated_fake = score_interpolated_fake.mean()
     grads = grad(outputs=score_interpolated_fake, 
                     inputs=(interpolated, caption_emb), 
                     grad_outputs=torch.ones_like(score_interpolated_fake).to(device),
@@ -53,7 +65,7 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
     rot_vec_real = batch.get('rot_vec').to(device) # torch.Size([128, 24, 3])
     rot_vec_wrong = batch.get('rot_vec_wrong').to(device)
     caption_mask = batch.get('caption_mask').to(device)
-    
+
     noise = get_noise_tensor(cfg.BATCH_SIZE, cfg.NOISE_SIZE).to(device)
     gp_fake = 0
     gp_wrong = 0
@@ -61,18 +73,18 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
     
     if update_d:
         # right
-        caption_emb_r = net_d.embedding(caption)
-        score_right = net_d(caption_emb_r, caption_mask, rot_vec_real).mean()
+        score_right, attn_d = net_d(net_d.embedding(caption), caption_mask, rot_vec_real)
+        score_right = score_right.mean()
         # wrong
-        caption_emb_w = net_d.embedding(caption)
-        score_wrong = net_d(caption_emb_w, caption_mask, rot_vec_wrong).mean()
+        score_wrong, _ = net_d(net_d.embedding(caption), caption_mask, rot_vec_wrong)
+        score_wrong = score_wrong.mean()
         # fake           
-        rot_vec_fake = net_g(caption, caption_mask, noise)
-        caption_emb_f = net_d.embedding(caption)
-        score_fake = net_d(caption_emb_f, caption_mask, rot_vec_fake.detach()).mean() 
+        rot_vec_fake, attn_g = net_g(caption, caption_mask, noise)
+        score_fake, _ = net_d(net_d.embedding(caption), caption_mask, rot_vec_fake.detach())
+        score_fake = score_fake.mean()
         # GP
         gp_fake, gp_wrong = get_grad_penalty(cfg.BATCH_SIZE, device, net_d, rot_vec_real, rot_vec_fake, caption, caption_mask)
-        loss_d = score_wrong + score_fake - 2*score_right + 5*gp_fake + 5*gp_wrong
+        loss_d = score_wrong + score_fake - 2*score_right + 10*gp_fake + 10*gp_wrong
         
         optimizer_d.zero_grad()
         loss_d.backward()
@@ -83,7 +95,9 @@ def get_d_loss(cfg, device, net_g, net_d, batch, batch_index, optimizer_d=None, 
         gp_wrong = 0
 
     if update_d:
-        net_d.zero_grad()     
+        net_d.zero_grad() 
+    if batch_index%50 == 0:
+        output_attn(attn_g, attn_d, batch.get('text'))
     return score_fake, score_wrong, score_right, gp_fake, gp_wrong
 
 def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True):
@@ -92,6 +106,8 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
     # get rot_vec, text vectors and noises
     caption = batch.get('caption').to(device)
     caption_mask = batch.get('caption_mask').to(device)
+    caption_wrong = batch.get('caption_wrong').to(device)
+    caption_mask_wrong = batch.get('caption_mask_wrong').to(device)
     #caption, caption_mask, caption_len, rot_vec_real = prepare_data((caption, caption_mask, caption_len, rot_vec_real), device)
     
     # get text vectors and noises
@@ -99,9 +115,13 @@ def get_g_loss(cfg, device, net_g, net_d, batch, optimizer_g=None, update_g=True
 
     if update_g:
         # rot_vec fake
-        rot_vec_fake = net_g(caption, caption_mask, noise1)
-        caption_emb_f = net_d.embedding(caption)
-        score_fake = net_d(caption_emb_f, caption_mask, rot_vec_fake).mean()
+        rot_vec_fake, _ = net_g(caption, caption_mask, noise1)
+        score_fake, _ = net_d(net_d.embedding(caption), caption_mask, rot_vec_fake)
+        score_fake = score_fake.mean()
+
+        rot_vec_fake_2, _ = net_g(caption, caption_mask, noise1)
+        score_fake_2, _ = net_d(net_d.embedding(caption_wrong), caption_mask_wrong, rot_vec_fake_2)
+        score_fake_2 = score_fake_2.mean()
         
         # 'wgan', 'wgan-gp'
         loss_g = - (score_fake)
@@ -130,14 +150,14 @@ def train_epoch(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_
         ###############################################################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###############################################################
-        
-        score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, i, optimizer_d)         
-        loss_d = score_fake + score_wrong - 2*score_right  + grad_penalty_fake + grad_penalty_wrong
+        if i % cfg.N_TRAIN_G == 0:
+            score_fake, score_wrong, score_right, grad_penalty_fake, grad_penalty_wrong = get_d_loss(cfg, device, net_g, net_d, batch, i, optimizer_d)         
+            loss_d = score_fake + score_wrong - 2*score_right  + grad_penalty_fake + grad_penalty_wrong
            
-        total_loss_d += loss_d.item()
-        if tb_writer != None:
-            tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
-            tb_writer.add_scalars('loss_d_wf', {'R_W': score_right-score_wrong, 'W_F': score_wrong-score_fake, 'w_loss': score_right-score_fake}, e*len(dataLoader_train)+i)
+            total_loss_d += loss_d.item()
+            if tb_writer != None:
+                tb_writer.add_scalars('loss_d_', {'score_fake': score_fake, 'score_wrong': score_wrong, 'score_right': score_right, 'grad_penalty_fake': grad_penalty_fake, 'grad_penalty_wrong':grad_penalty_wrong}, e*len(dataLoader_train)+i)
+                tb_writer.add_scalars('loss_d_wf', {'R_W': score_right-score_wrong, 'W_F': score_wrong-score_fake, 'w_loss': score_right-score_fake}, e*len(dataLoader_train)+i)
         
         ###############################################################
         # (2) Update G network: maximize log(D(G(z)))
@@ -176,10 +196,10 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train,
         print("[Info] Use Tensorboard")  
         tb_writer = SummaryWriter(log_dir=cfg.TB_DIR) 
 
-    for p in net_g.embedding.parameters():
+    """"for p in net_g.embedding.parameters():
         p.requires_grad = False
     for q in net_d.embedding.parameters():
-        q.requires_grad = False
+        q.requires_grad = False"""
        
     start_of_all_training = time.time()
     for e in range(cfg.START_FROM_EPOCH, cfg.END_IN_EPOCH):   
@@ -214,7 +234,6 @@ def train(cfg, device, net_g, net_d, optimizer_g, optimizer_d, dataLoader_train,
     elapse_final=(time.time()-start_of_all_training)/60
     print('\nfinished! ' + str(elapse_final) + " minutes")
 
-
 if __name__ == "__main__":
     """a = torch.tensor([[[2,2,2,2,2]],[[2,2,2,2,2]]], dtype=torch.float32)
     print(a.size())
@@ -230,5 +249,4 @@ if __name__ == "__main__":
     a = torch.tensor([[[2,2,2,2,2],[5,5,5,5,5]],[[7,7,7,7,7],[8,8,8,8,8]]], dtype=torch.float32)
     b = torch.tensor([1,2]).unsqueeze(0).unsqueeze(-1)
     print(a.size())
-    print(b.size())
-    print(a*b)
+    print(a.unsqueeze(1).size())

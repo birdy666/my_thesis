@@ -20,7 +20,7 @@ class ScaledDotProductAttention(nn.Module):
         attn = F.softmax(attn, dim=-1)
         #attn = self.dropout(attn)
         output = torch.matmul(attn, v)        
-        return output
+        return output, attn
 
 class MultiHeadAttention(nn.Module):
     ''' Multi-Head Attention module '''
@@ -52,13 +52,13 @@ class MultiHeadAttention(nn.Module):
 
         q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
 
-        score = self.attention(q, k, v, mask=mask)
+        score, attn = self.attention(q, k, v, mask=mask)
 
         score_concat = score.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
         output = self.fc(score_concat)
         output = self.dropout(output) 
         output += residual
-        return output
+        return output, attn
 
 class PositionwiseFeedForward(nn.Module):
     def __init__(self, d_in, d_hid, dropout=0.1):

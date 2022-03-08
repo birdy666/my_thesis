@@ -4,7 +4,9 @@ from tqdm import tqdm
 
 
 def pose_distance(pose_1, pose_2):
-    return torch.sum(torch.sqrt(torch.sum((pose_1-pose_2)**2, dim=-1)), dim=-1).mean()
+    return torch.sum(torch.sqrt(torch.sum((pose_1 - pose_2) ** 2, axis=1)))
+
+    #return torch.sum(torch.sqrt(torch.sum((pose_1-pose_2)**2, dim=-1)), dim=-1).mean()
 
 # find the nearest neighbor distance of a heatmap in a list of heatmaps
 def nearest_neighbor_distance(pose, pose_list):

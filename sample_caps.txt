@@ -1,0 +1,200 @@
+0: A man riding a motor bike across a forest.
+1: A man tossing an orange frisbee on top of a lush green field.
+2: landscape of a snowy mountain with a skiers trail in the snow
+3: A tennis player in action on the court.
+4: A young man laying on the ground while wearing skis.
+5: A man performing a trick on a skateboard.
+6: A man in swim shorts is riding a surf board.
+7: A man flying a kite in a cloudy blue sky.
+8: A woman in the middle of swinging a tennis racket. 
+9: A person about to swing a tennis racket
+10: A man riding a wave on top of a surfboard.
+11: there is a an riding a skateboard in a ramp 
+12: A person on a surfboard in the water.
+13: A skateboarder is in mid air during a jump.
+14: a person doing a trick on a surfboard in the ocean.
+15: A man in a grassy field holding a kite.
+16: A man holding a tennis racquet on a tennis court.
+17: A lone female surfer rides a small wave. 
+18: Man skateboarding on red pavement on his board. 
+19: A man riding a surfboard in the middle of the ocean,
+20: a surfer at the beach catching a wave
+21: a woman tennis player hits a tennis ball 
+22: A surfer balances on his board as he climbs the face of a wave.
+23: A man that is on a rail with a skateboard.
+24: a person that is on a skateboard on some concrete
+25: A man holding a tennis racket up in anticipation of a ball.
+26: Man in wetsuit riding a wave on his surf board.
+27: A guy surfing and riding out underneath a wave.
+28: A young girl skiing on a snowy slope.
+29: a man on a surf board rides in front of a big wave
+30: A racing motorcycle is being ridden on a road.
+31: A tennis player swinging his racket on a court.
+32: a person riding a surf board on a wave
+33: A man doing skateboard tricks in a small yard
+34: a person riding a surf board on a wave
+35: Surfer taking a wave on a surf board.
+36: A man taking a swing at a tennis ball.
+37: A man riding a surfboard on a wave in the ocean.
+38: A man in a baseball uniform getting ready to bat the ball.
+39: A baseball player that just swung a bat at a baseball game.
+40: A man riding a white surfboard on a wave in the ocean.
+41: A man in a black wet-suit surfing on a wave.
+42: A female tennis player is swinging her tennis racquet to hit the ball. 
+43: A pretty little girl flying a kite on a sandy beach.
+44: A man in a suit riding a motorcycle.
+45: A cross country skier is out on a very snowy course.
+46: The jumping skateboarder is casting a shadow on the wall.
+47: A young man holding a tennis racquet on a  tennis court.
+48: A man riding skis on top of a snow covered slope.
+49: A man riding skis down a snow covered ski slope.
+50: Santa Claus is riding a motorcycle down the street.
+51: A young man riding a skateboard in front of a tall building.
+52: A cross country skier on a path through the woods
+53: A baseball player pitching a baseball on a field.
+54: a man that is jumping a skateboard over a rail
+55: Boy rides down stairs in front of house on skateboard
+56: A person running across a field near a flying frisbee.
+57: A young girl surfing a small wave in the ocean.
+58: A man flying through the air riding a skateboard.
+59: A man on a surfboard surfing in the ocean.
+60: The little girl in pink shirt and beige pants throws the frisbee.
+61: A baseball pitcher on the mound about to throw a pitch.
+62: A guy is surfing in some green looking water.
+63: A man riding skis down a snow covered race track.
+64: A man in a cowboy hat throwing a frisbee.
+65: The man is hitting the ball during a baseball game. 
+66: A man doing a trick on a skateboard on a ramp.
+67: A man surfing with titling that reads "spray."
+68: a man in a red shirt playing tennis
+69: a male surfer in a wet suit is surfing on a white board
+70: a man in all white tennis attire swinging a tennis racket
+71: A person in skis riding down a snowy slope.
+72: A young man holding his surfing board in the ocean. 
+73: a skateboarder in a red shirt is doing a trick
+74: Upward view of person flying a kite in pure blue sky
+75: A young boy swinging a baseball bat in a forest.
+76: Little boy hold his stance ready to swing his tennis racket
+77: A woman swinging a tennis racquet on a tennis court.
+78: A beautiful woman holding a tennis racquet on a court.
+79: A man riding a wave on top of a surfboard.
+80: The surfer is offering his favorite hand signal.
+81: The man holds on to the green sail as he surfs on the blue waters.
+82: a person in sport wear with a frisbee in a field
+83: A man in black jacket holding a white and blue surfboard.
+84: a man is skiing down a hill covered mountain
+85: A woman skiing with trees in the background.
+86: A decal of a skateboarding man is applied to the wall.
+87: The man is driving the motorcycle on the road.
+88: The man is about ready to surf on the water. 
+89: A male skier dressed in red traveling down a slope.
+90: A man riding a skateboard in front of a white building.
+91: a girl is flying a kite in a field
+92: A man on a red motorcycle performing a stunt.
+93: A man holding a surfboard on the beach next to a drainage pipe.
+94: A man holding a blue frisbee in his right hand.
+95: a man with a tennis racket on a court
+96: A woman looks down while in mid-air riding a skateboard 
+97: A young man performing a stunt on his skateboard.
+98: a person riding a surf board on a wave
+99: A man swinging a blue tennis racket at a ball.
+100: A boy hits a tennis ball with his racket
+101: Skateboarder displaying skills in bowl shaped area on cloudy day.
+102: A man riding a skateboard up into the air.
+103: A young skier makes their way down a slope.
+104: A person skis through a forest during a competition.
+105: Professional baseball player hitting a baseball during the day.
+106: A female tennis player swings at the ball.
+107: A man on a skateboard at the top of a ramp.
+108: The man looks at a kite flying high in the air.
+109: A man riding skis down the side of a snow covered slope.
+110: A skier in red snowsuit next to trees.
+111: A young man riding a skateboard down a street.
+112: A skier making his way down a snowy slope
+113: A man riding a skateboard on the side of a metal hand rail.
+114: A woman riding a surfboard in the ocean under a blue sky.
+115: A skateboarder does a trick along a hand rail in a warehouse.
+116: a women that is surfing on a surfboard with a kite
+117: A man flying through the air while riding a skateboard.
+118: a woman is wearing a white dress and playing tennis
+119: A person in air surfing with a sail.
+120: A helmet wearing man riding on his motorcycle.
+121: A woman riding skis on the top of a ski slope.
+122: The skateboarder jumps off of a ledge near the brick building.
+123: A man riding skis down a snow covered slope.
+124: A man returning a tennis ball in a tennis game.
+125: A man kneeling down looking at a motorcycle
+126: A woman swinging a tennis racket at a ball on a clay tennis court.
+127: a person riding a surf board on a wave
+128: A boy in a red ballcap doing tricks on his skateboard
+129: A woman in sunglasses is on snow skis.
+130: A skateboarder mid-air doing a trick on cobblestone.
+131: A woman attempts to ski along a large mound of snow.
+132: A person on a skateboard on a city street.
+133: A person jumping up into the air with a skateboard.
+134: A person on skies in a snowsuit skiing down a slope.
+135: A teenager riding a skateboard on a ramp in a front yard.
+136: A surfer is riding a medium wave .
+137: a person riding a surf board behind a boat
+138: A man riding a wave on a surfboard in the ocean.
+139: A man riding on the back of a red motorcycle.
+140: a man that is jumping his skateboard on some grass
+141: A person surfs on a wave in a body of water
+142: A young man riding a pair of skis down a snow covered slope.
+143: A woman riding skis down a snow covered slope.
+144: A girl is playing tennis on a green surface
+145: A man riding a skateboard on the side of a ramp.
+146: A woman takes a swing at a tennis ball that is high in the air.
+147: A surfer in a wetsuit catching a wave on a pale green ocean.
+148: A pitcher pulls his arm back to throw a baseball
+149: A young boy riding a skateboard across a wooden floor.
+150: Man cross country skiing with a yellow lab. 
+151: A man on a skateboard in motion on a track.
+152: A boy catches a tennis ball with his racket. 
+153: Guy on tennis court gets ready to serve the ball to the other side
+154: a baseball player throwing a pitch from the mound 
+155: A man holding a racquet and tennis ball.
+156: A surfer riding his bike to the beach.
+157: Woman holding skis wearing tank top and ski gear.
+158: a special effected image of a boy doing tricks on his skateboard
+159: A person on a skateboard on a street doing a trick.
+160: A man riding skis down the side of a snow covered ski slope.
+161: A young girl riding skis down a snow covered slope.
+162: a person riding a surf board in a boy of water
+163: A woman stretches to swat a tennis ball.
+164: A person riding a wave on top of a surfboard.
+165: A skier takes a huge jump on the slopes.
+166: A man carrying a skateboard over his right shoulder.
+167: A tennis player is holding his hand up to guard himself from the flying ball.
+168: A skier is headed down a very steep slope.
+169: a man in white tennis shorts is playing tennis
+170: A man on a court swinging a tennis racket.
+171: A pretty young lady holding a tennis racquet on a tennis court.
+172: A man stretches to reach a tennis ball during a game
+173: a close up of a baseball player getting ready to throw a ball
+174: A man rides a wave on a surfboard.
+175: The young man was playing on his skateboard while he listened to some music.
+176: A person on a surfboard in the water.
+177: A young person skateboarding down a concrete ramp.
+178: A man young man riding a skateboard next to a brick building.
+179: The smiling woman is skiing down the slope.
+180: A man in hat throwing a frisbee into grassy area.
+181: The young man is posing with his skateboard. 
+182: A tennis player about to hit the ball. 
+183: A person skiing in the snow on a hill
+184: A person riding skis down a snow covered ski slope.
+185: A woman holding a tennis racquet on top of a tennis court.
+186: A man with a skateboard on concrete wearing knee pads and a helmet.
+187: a person riding a surf board on a wave
+188: The athlete rides the motor boat on the blue water
+189: A woman on a tennis court about to serve the ball.
+190: A person wearing a red ski jacket skiing down a hill.
+191: A hipster riding a skateboard up the side of a wall.
+192: A man skiing on a mountain covered with snow
+193: A person riding a wave on a surfboard.
+194: A man riding a wave in the ocean on a surfboard
+195: The man is on the snow cross country skiing. 
+196: A man riding a surfboard on a wave in the ocean.
+197: A man with a visor and sunglasses on a grass field and holding a frisbee in both hands.
+198: A girl riding skis holding two ski poles.
+199: A woman waterskiing with trees in the background.

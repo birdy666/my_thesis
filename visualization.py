@@ -118,7 +118,7 @@ def visEFT_singleSubject(renderer, eft_data_all, real=False):
         ########################
 
         # Visualize 2D image
-        if True:
+        if False:
             viewer2D.ImShow(rawImg, name='rawImg', waitTime=1)      #You should press any key 
             viewer2D.ImShow(croppedImg, name='croppedImg', waitTime=1)
 
@@ -167,7 +167,7 @@ def visEFT_singleSubject(renderer, eft_data_all, real=False):
             #renderer.setViewportSize(64, 64)
                 
                 
-            renderer.display()
+            """renderer.display()"""
             renderImg = renderer.get_screen_color_ibgr()
             """viewer2D.ImShow(renderImg,waitTime=1)"""
 
@@ -191,7 +191,6 @@ def visEFT_singleSubject(renderer, eft_data_all, real=False):
             sideImg = cv2.resize(sideImg, (renderImg.shape[1], renderImg.shape[0]) )
             # renderImg = cv2.resize(renderImg, (sideImg.shape[1], sideImg.shape[0]) )
         
-
         #Visualize camera view and side view
         """saveImg = np.concatenate( (renderImg,sideImg), axis =1)"""
         saveImg = sideImg
@@ -250,7 +249,7 @@ if __name__ == '__main__':
         eft_all_with_caption_real = json.load(f)
         eft_all_with_caption_real = eft_all_with_caption_real[:200]
     visEFT_singleSubject(renderer,eft_all_with_caption)
-    visEFT_singleSubject(renderer,eft_all_with_caption_real, real = True)
+    #visEFT_singleSubject(renderer,eft_all_with_caption_real, real = True)
     with open("./sample_caps.txt", "w") as fhandle:
         for line in captions:
             fhandle.write(f'{line}\n')
